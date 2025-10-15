@@ -1,0 +1,50 @@
+{
+  "company": {
+    "name": "마이다스",
+    "industry": "IT/소프트웨어",
+    "company_size": "mid-size",
+    "location": "서울",
+    "website": null
+  },
+  "job_posting": {
+    "title": "데이터 엔지니어 (Data Engineer)",
+    "description": "데이터 플랫폼 설계·구축·운영 및 ETL 파이프라인 관리",
+    "raw_text": "마이다스의 데이터 플랫폼을 설계·구축·운영하며, 데이터 기반 의사결정과 조직 성장을 지원하는 역할입니다.\n\nETL 파이프라인부터 데이터 마트·거버넌스까지 전 과정을 경험하며 데이터 엔지니어 전문가로 성장할 수 있습니다.\n\n합류하게 되면 이런 일을 하게 돼요\n\n- Airflow 기반 ETL 파이프라인을 구축·관리해요.\n- 분석 및 대시보드를 위한 데이터 마트를 설계·개발해요.\n- 데이터 플랫폼 관련 시스템을 설계·구축·운영해요.\n- 데이터 거버넌스 체계를 수립하고 데이터 품질을 관리해요.\n\n이런 분과 함께 일하고 싶어요\n\n- Python을 포함한 프로그래밍 언어 하나 이상에 익숙하신 분\n- 데이터베이스와 데이터 모델링에 대한 이해가 있고 SQL에 능숙한 분\n- Docker, Kubernetes에 대한 이해와 클라우드(AWS, GCP) 환경에서 개발 경험이 있는 분\n\n이런 분을 우대해요!\n\n- Airflow 환경에서 데이터 ETL 파이프라인을 구축해본 경험이 있는 분\n- 통계 및 머신러닝 기반 데이터 분석에 대한 경험과 이해가 있는 분\n\n이런 태도와 역량을 기대해요\n\n- 데이터와 비즈니스를 연결해 문제를 정의하고 이를 실험과 검증으로 개선해 나가는 태도\n- 데이터 무결성과 품질을 고민하며 도메인 요구사항에 맞게 데이터를 정제·가공할 수 있는 역량\n- 분석적 사고 및 논리적인 문제 해결 능력\n- 빠르게 변화하는 기술 환경에 적응하고 학습할 수 있는 자기주도적 학습 능력\n- 동료들과 원활히 협업할 수 있는 커뮤니케이션 능력\n\n함께하기 위한 여정이에요\n\n지원하기 > 역량검사, 개발 구현 능력 검사 > 커피챗 > 최종 합격",
+    "requirements": {
+      "required": [
+        "Python을 포함한 프로그래밍 언어 하나 이상에 익숙",
+        "데이터베이스와 데이터 모델링에 대한 이해가 있고 SQL에 능숙",
+        "Docker, Kubernetes에 대한 이해와 클라우드(AWS, GCP) 환경에서 개발 경험"
+      ],
+      "preferred": [
+        "Airflow 환경에서 데이터 ETL 파이프라인을 구축해본 경험",
+        "통계 및 머신러닝 기반 데이터 분석에 대한 경험과 이해"
+      ]
+    },
+    "responsibilities": [
+      "Airflow 기반 ETL 파이프라인을 구축·관리",
+      "분석 및 대시보드를 위한 데이터 마트를 설계·개발",
+      "데이터 플랫폼 관련 시스템을 설계·구축·운영",
+      "데이터 거버넌스 체계를 수립하고 데이터 품질을 관리"
+    ],
+    "qualifications": {
+      "education": "학력무관",
+      "experience": "신입/경력",
+      "certifications": []
+    },
+    "benefits": [],
+    "employment_type": "full-time",
+    "experience_level": "junior",
+    "min_experience_years": 0,
+    "max_experience_years": null,
+    "salary_min": null,
+    "salary_max": null,
+    "salary_currency": "KRW",
+    "location": "서울",
+    "remote_type": "onsite",
+    "source": "midas",
+    "external_url": null,
+    "posted_at": "2024-01-01",
+    "expires_at": null
+  }
+}

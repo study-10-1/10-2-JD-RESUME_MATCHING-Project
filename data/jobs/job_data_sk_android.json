@@ -1,0 +1,59 @@
+{
+  "company": {
+    "name": "SK그룹 계열사",
+    "industry": "IT/인터넷",
+    "company_size": "enterprise",
+    "location": "서울",
+    "website": "https://sk.com"
+  },
+  "job_posting": {
+    "title": "Android 개발자 (Kotlin, Jetpack Compose)",
+    "description": "BLE 및 Wi-Fi 기반 IoT 디바이스 연결 Android 앱 개발",
+    "raw_text": "이런 일을 합니다.\n담당 업무 및 역할\nKotlin, Jetpack Compose(안드로이드) 기반 서비스 개발, 운영 및 유지 보수\nBLE 및 Wi-Fi 기반 디바이스 연결 및 통신 기능 개발\nAWS IoT Core 통한 MQTT 메세지 송수신 처리\nAWS Cognito를 이용한 사용자 인증 및 세션 관리\nREST API 연동, 앱 상태 관리, 에러 핸들링 등 전반적인 품질 개선\n\n이런 분과 함께 하고 싶습니다.\n지원자격\n학력\n학사 학위 이상\n경력\n경력 5년 이상\nAndroid 앱 경력 5년 이상\nKotlin 및 Jetpack Compose 실무 경험\nHilt, Coroutine, Flow 등 모던 Android 스택 경험\n\n우대 사항\n클린 아키텍처 기반의 앱 구조 설계/유지 경험\nBLE 통신 / Wifi 기반 디바이스 검색/연결 경험\nAWS IoT Core 활용한 MQTT 메시징 처리 경험\nAWS SDK 사용 경험\n플레이스토어 배포 및 운영 경험\n\n이러한 여정으로 진행됩니다.\n전형절차\n서류접수→SKCT전형→면접→처우협의→채용검진→입사\n경력 인재영입 특성상, 모집직무에 적합한 지원자가 없을 경우 최종 합격자가 없을 수도 있음을 사전에 안내드립니다.\n입사 후 3개월의 수습 기간 적용, 평가에 따라 수습 기간 연장이나 채용이 취소될 수 있습니다. (급여 동일)\n일부 포지션의 경우 평판조회 전형이 추가 될 수 있습니다. (후보자 개별 안내)\n\n미리 확인해 주세요.\n기타\n공통사항\n해외여행에 결격이 없는 분, (남성의 경우)병역 필 또는 면제이신 분\n보훈 대상자 및 장애인 등록증 소지자는 관련 법에 의거 우대합니다.\n본 공고는 SK그룹의 타 공고와 중복지원 할 수 없습니다.",
+    "requirements": {
+      "required": [
+        "학사 학위 이상",
+        "경력 5년 이상",
+        "Android 앱 경력 5년 이상",
+        "Kotlin 및 Jetpack Compose 실무 경험",
+        "Hilt, Coroutine, Flow 등 모던 Android 스택 경험"
+      ],
+      "preferred": [
+        "클린 아키텍처 기반의 앱 구조 설계/유지 경험",
+        "BLE 통신 / Wifi 기반 디바이스 검색/연결 경험",
+        "AWS IoT Core 활용한 MQTT 메시징 처리 경험",
+        "AWS SDK 사용 경험",
+        "플레이스토어 배포 및 운영 경험"
+      ]
+    },
+    "responsibilities": [
+      "Kotlin, Jetpack Compose(안드로이드) 기반 서비스 개발, 운영 및 유지 보수",
+      "BLE 및 Wi-Fi 기반 디바이스 연결 및 통신 기능 개발",
+      "AWS IoT Core 통한 MQTT 메세지 송수신 처리",
+      "AWS Cognito를 이용한 사용자 인증 및 세션 관리",
+      "REST API 연동, 앱 상태 관리, 에러 핸들링 등 전반적인 품질 개선"
+    ],
+    "qualifications": {
+      "education": "학사 이상",
+      "experience": "경력 5년 이상",
+      "certifications": []
+    },
+    "benefits": [
+      "SK그룹 복리후생",
+      "3개월 수습 기간 (급여 동일)"
+    ],
+    "employment_type": "full-time",
+    "experience_level": "senior",
+    "min_experience_years": 5,
+    "max_experience_years": null,
+    "salary_min": null,
+    "salary_max": null,
+    "salary_currency": "KRW",
+    "location": "서울",
+    "remote_type": "onsite",
+    "source": "sk_careers",
+    "external_url": null,
+    "posted_at": "2024-01-01",
+    "expires_at": null
+  }
+}

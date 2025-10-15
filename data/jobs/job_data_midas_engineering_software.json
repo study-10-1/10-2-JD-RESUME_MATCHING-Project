@@ -1,0 +1,49 @@
+{
+  "company": {
+    "name": "마이다스",
+    "industry": "IT/소프트웨어",
+    "company_size": "mid-size",
+    "location": "서울",
+    "website": null
+  },
+  "job_posting": {
+    "title": "엔지니어링 소프트웨어 개발자 (LLM 기반 Design Editor)",
+    "description": "엔지니어링 솔루션 제품 응용 개발 및 LLM 기반 설계 개발 시스템 구현",
+    "raw_text": "마이다스의 엔지니어링 솔루션 제품과 신규 과제의 응용 개발을 주도하며, LLM 기반 설계 개발 시스템을 구현하는 역할입니다.\n\n웹 개발부터 Design Editor 구현까지 전 과정을 경험하며 엔지니어링 소프트웨어 전문 개발자로 성장할 수 있습니다.\n\n합류하게 되면 이런 일을 하게 돼요\n\n- 엔지니어링 솔루션 제품의 응용 개발과 신규 과제의 웹 개발을 수행해요.\n- LLM 기반 설계 개발 시스템(Design Editor)을 웹으로 개발해요.\n- 엔지니어링 솔루션 제품과 신규 과제의 응용 기능을 기획·구현해요.\n\n이런 분과 함께 일하고 싶어요\n\n- 원활한 커뮤니케이션 및 협업 역량을 보유하신 분\n\n이런 분을 우대해요!\n\n- 웹 프론트엔드/백엔드 개발 경험이 있는 분\n- 엔지니어링 소프트웨어(RPM, CAD, FEM 등)에 관심이나 경험이 있는 분\n- LLM 또는 AI 기반 서비스 개발 경험이 있는 분\n- 클라우드 환경(AWS, GCP, Azure)에서 서비스 개발·운영 경험이 있는 분\n\n함께하기 위한 여정이에요\n\n지원하기 > 역량검사, 개발 구현 능력 검사 > 커피챗 > 최종 합격",
+    "requirements": {
+      "required": [
+        "원활한 커뮤니케이션 및 협업 역량"
+      ],
+      "preferred": [
+        "웹 프론트엔드/백엔드 개발 경험",
+        "엔지니어링 소프트웨어(RPM, CAD, FEM 등)에 관심이나 경험",
+        "LLM 또는 AI 기반 서비스 개발 경험",
+        "클라우드 환경(AWS, GCP, Azure)에서 서비스 개발·운영 경험"
+      ]
+    },
+    "responsibilities": [
+      "엔지니어링 솔루션 제품의 응용 개발과 신규 과제의 웹 개발을 수행",
+      "LLM 기반 설계 개발 시스템(Design Editor)을 웹으로 개발",
+      "엔지니어링 솔루션 제품과 신규 과제의 응용 기능을 기획·구현"
+    ],
+    "qualifications": {
+      "education": "학력무관",
+      "experience": "신입/경력",
+      "certifications": []
+    },
+    "benefits": [],
+    "employment_type": "full-time",
+    "experience_level": "junior",
+    "min_experience_years": 0,
+    "max_experience_years": null,
+    "salary_min": null,
+    "salary_max": null,
+    "salary_currency": "KRW",
+    "location": "서울",
+    "remote_type": "onsite",
+    "source": "midas",
+    "external_url": null,
+    "posted_at": "2024-01-01",
+    "expires_at": null
+  }
+}

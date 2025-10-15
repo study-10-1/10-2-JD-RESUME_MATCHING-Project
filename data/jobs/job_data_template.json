@@ -1,0 +1,58 @@
+{
+  "company": {
+    "name": "토스",
+    "industry": "핀테크",
+    "company_size": "mid-size",
+    "location": "서울 강남구",
+    "website": "https://toss.im"
+  },
+  "job_posting": {
+    "title": "Python 백엔드 개발자",
+    "description": "결제 시스템 백엔드 개발",
+    "raw_text": "토스에서 Python 백엔드 개발자를 모집합니다.\n\n[주요 업무]\n- 결제 시스템 백엔드 개발\n- API 설계 및 개발\n- 데이터베이스 설계 및 최적화\n- 시스템 성능 개선\n\n[자격 요건]\n- Python 3년 이상 개발 경험\n- Django/FastAPI 프레임워크 경험\n- PostgreSQL, Redis 경험\n- RESTful API 설계 경험\n\n[우대 사항]\n- AWS 클라우드 경험\n- Docker, Kubernetes 경험\n- 마이크로서비스 아키텍처 경험\n- 금융/결제 도메인 경험\n\n[복리후생]\n- 유연한 근무시간\n- 재택근무 가능\n- 최신 장비 제공\n- 교육비 지원",
+    "requirements": {
+      "required": [
+        "Python 3년 이상 개발 경험",
+        "Django/FastAPI 프레임워크 경험",
+        "PostgreSQL, Redis 경험",
+        "RESTful API 설계 경험"
+      ],
+      "preferred": [
+        "AWS 클라우드 경험",
+        "Docker, Kubernetes 경험",
+        "마이크로서비스 아키텍처 경험",
+        "금융/결제 도메인 경험"
+      ]
+    },
+    "responsibilities": [
+      "결제 시스템 백엔드 개발",
+      "API 설계 및 개발",
+      "데이터베이스 설계 및 최적화",
+      "시스템 성능 개선"
+    ],
+    "qualifications": {
+      "education": "학력무관",
+      "experience": "경력 3년 이상",
+      "certifications": []
+    },
+    "benefits": [
+      "유연한 근무시간",
+      "재택근무 가능",
+      "최신 장비 제공",
+      "교육비 지원"
+    ],
+    "employment_type": "full-time",
+    "experience_level": "mid",
+    "min_experience_years": 3,
+    "max_experience_years": 7,
+    "salary_min": 50000000,
+    "salary_max": 70000000,
+    "salary_currency": "KRW",
+    "location": "서울 강남구",
+    "remote_type": "hybrid",
+    "source": "wanted",
+    "external_url": "https://www.wanted.co.kr/wd/12345",
+    "posted_at": "2024-01-15",
+    "expires_at": "2024-02-15"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "company": {
+    "name": "마이다스",
+    "industry": "IT/소프트웨어",
+    "company_size": "mid-size",
+    "location": "서울",
+    "website": null
+  },
+  "job_posting": {
+    "title": "AI/LLM 개발자",
+    "description": "AI/LLM 기술을 활용한 서비스 개발 및 최신 AI 기술 적용",
+    "raw_text": "마이다스에서 개발하는 서비스에 AI/LLM 기술을 적용하여 기능을 개발하고, 최신 AI 기술을 탐색하여 실제 서비스에 적용하는 역할입니다.\n\nPoC(Proof of Concept)부터 서비스 구현까지 전 과정을 경험하며 AI·LLM 전문가로 성장할 수 있습니다.\n\n합류하게 되면 이런 일을 하게 돼요\n\n- AI 및 LLM 기술을 활용한 기능을 개발해요.\n- LLM을 포함한 최신 AI 기술을 탐색하고 PoC(Proof of Concept)를 통해 실제 서비스에 적용해요.\n\n이런 분과 함께 일하고 싶어요\n\n- Python을 활용해 머신러닝 또는 LLM 기반 서비스를 개발·운영한 경험이 있는 분\n- 클라우드, CI/CD, DB 등 백엔드 시스템 개발 전반에 대한 이해 및 경험을 보유한 분\n\n이런 분을 우대해요!\n\n- 선형대수, 통계학, 머신러닝 및 LLM 기반 지식에 대한 이해도가 높은 분\n- LangChain 등 LLM 프레임워크 활용 경험이 있는 분\n- LangGraph, Google ADK 등 Agent 개발 프레임워크 활용 경험이 있는 분\n- VectorDB를 포함한 RAG 시스템 구축 경험이 있는 분\n- AI(ML, LLM 등) 관련 오픈소스 프로젝트에 참여한 경험이 있는 분\n- 목적에 맞게 Open-weights LLM을 Fine-tuning하여 서비스에 적용해본 경험이 있는 분\n\n이런 태도와 역량을 기대해요\n\n- 분석적 사고 및 논리적인 문제 해결 능력\n- 어려운 문제에 집요하게 몰입할 수 있는 능력\n- 빠르게 변화하는 기술 환경에 적응하고 학습할 수 있는 자기주도적 학습 능력\n- 동료들과 원활히 협업할 수 있는 커뮤니케이션 능력\n\n함께하기 위한 여정이에요\n\n지원하기 > 역량검사, 개발 구현 능력 검사 > 커피챗 > 최종 합격",
+    "requirements": {
+      "required": [
+        "Python을 활용해 머신러닝 또는 LLM 기반 서비스를 개발·운영한 경험",
+        "클라우드, CI/CD, DB 등 백엔드 시스템 개발 전반에 대한 이해 및 경험"
+      ],
+      "preferred": [
+        "선형대수, 통계학, 머신러닝 및 LLM 기반 지식에 대한 이해도가 높은 분",
+        "LangChain 등 LLM 프레임워크 활용 경험",
+        "LangGraph, Google ADK 등 Agent 개발 프레임워크 활용 경험",
+        "VectorDB를 포함한 RAG 시스템 구축 경험",
+        "AI(ML, LLM 등) 관련 오픈소스 프로젝트에 참여한 경험",
+        "목적에 맞게 Open-weights LLM을 Fine-tuning하여 서비스에 적용해본 경험"
+      ]
+    },
+    "responsibilities": [
+      "AI 및 LLM 기술을 활용한 기능을 개발",
+      "LLM을 포함한 최신 AI 기술을 탐색하고 PoC(Proof of Concept)를 통해 실제 서비스에 적용"
+    ],
+    "qualifications": {
+      "education": "학력무관",
+      "experience": "신입/경력",
+      "certifications": []
+    },
+    "benefits": [],
+    "employment_type": "full-time",
+    "experience_level": "junior",
+    "min_experience_years": 0,
+    "max_experience_years": null,
+    "salary_min": null,
+    "salary_max": null,
+    "salary_currency": "KRW",
+    "location": "서울",
+    "remote_type": "onsite",
+    "source": "midas",
+    "external_url": null,
+    "posted_at": "2024-01-01",
+    "expires_at": null
+  }
+}
