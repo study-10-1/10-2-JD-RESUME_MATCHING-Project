@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Auto-Match: AI-based Resume & Job Matching System
 
 **한국어 특화 AI 기반 이력서-채용공고 자동 매칭 시스템**
@@ -303,3 +304,7 @@ MIT License
 ---
 
 **💡 Tip**: 상세한 설명은 [`docs/`](docs/) 폴더를 참고하세요!
+=======
+# 10-2-JD-RESUME_MATCHING-Project
+10-2-JD-RESUME_MATCHING-Project
+>>>>>>> 59b895c0e2bea02fca195af2d94e296f7cafb4bd
