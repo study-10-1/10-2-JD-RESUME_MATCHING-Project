@@ -1,7 +1,7 @@
 """
 Matching API Routes - 매칭 API 엔드포인트
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from uuid import UUID
 from typing import Dict, Any
@@ -132,11 +132,13 @@ async def search_jobs_for_resume(
 @router.get("/{matching_id}")
 async def get_matching_detail_by_token(
     matching_id: str,
+    # Cross-encoder 제거됨
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
     매칭 결과 상세 조회 (가짜 ID 토큰 기반, DB 저장 없이 재계산)
     - 빠른 응답을 위해 LLM 피드백은 포함하지 않음
+    - Cross-encoder 제거됨 (Bi-encoder만 사용)
     """
     try:
         svc = MatchingService(db)
@@ -149,7 +151,7 @@ async def get_matching_detail_by_token(
         if not job or not resume:
             raise HTTPException(status_code=404, detail="Job or Resume not found")
 
-        # 상세는 신속 응답을 위해 피드백 비활성화
+        # Bi-encoder만 사용 (Cross-encoder 제거됨)
         result = svc.calculate_matching_score(job, resume, generate_feedback=False)
 
         # 사용자 친화적인 응답 구조로 변환
@@ -180,12 +182,14 @@ async def get_matching_detail_by_token(
                     "score": round(result.category_scores.get('required_match', {}).get('score', 0) * 100, 1),
                     "matched_skills": result.matching_evidence.get('required_skills', {}).get('matched', []),
                     "missing_skills": result.matching_evidence.get('required_skills', {}).get('missing', []),
-                    "match_rate": result.matching_evidence.get('required_skills', {}).get('match_rate', '0/0')
+                    "match_rate": result.matching_evidence.get('required_skills', {}).get('match_rate', '0/0'),
+                    "detailed_analysis": result.matching_evidence.get('required_skills', {}).get('detailed_analysis', [])
                 },
                 "preferred_qualifications": {
                     "score": round(result.category_scores.get('preferred_match', {}).get('score', 0) * 100, 1),
                     "matched_skills": result.matching_evidence.get('preferred_skills', {}).get('matched', []),
-                    "missing_skills": result.matching_evidence.get('preferred_skills', {}).get('missing', [])
+                    "missing_skills": result.matching_evidence.get('preferred_skills', {}).get('missing', []),
+                    "detailed_analysis": result.matching_evidence.get('preferred_skills', {}).get('detailed_analysis', [])
                 },
                 "experience_fit": {
                     "score": round(result.category_scores.get('experience_match', {}).get('score', 0) * 100, 1),
@@ -264,12 +268,14 @@ async def generate_feedback_on_demand(
                     "score": round(result.category_scores.get('required_match', {}).get('score', 0) * 100, 1),
                     "matched_skills": result.matching_evidence.get('required_skills', {}).get('matched', []),
                     "missing_skills": result.matching_evidence.get('required_skills', {}).get('missing', []),
-                    "match_rate": result.matching_evidence.get('required_skills', {}).get('match_rate', '0/0')
+                    "match_rate": result.matching_evidence.get('required_skills', {}).get('match_rate', '0/0'),
+                    "detailed_analysis": result.matching_evidence.get('required_skills', {}).get('detailed_analysis', [])
                 },
                 "preferred_qualifications": {
                     "score": round(result.category_scores.get('preferred_match', {}).get('score', 0) * 100, 1),
                     "matched_skills": result.matching_evidence.get('preferred_skills', {}).get('matched', []),
-                    "missing_skills": result.matching_evidence.get('preferred_skills', {}).get('missing', [])
+                    "missing_skills": result.matching_evidence.get('preferred_skills', {}).get('missing', []),
+                    "detailed_analysis": result.matching_evidence.get('preferred_skills', {}).get('detailed_analysis', [])
                 },
                 "experience_fit": {
                     "score": round(result.category_scores.get('experience_match', {}).get('score', 0) * 100, 1),
@@ -336,6 +342,81 @@ async def compare_resume_and_job(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Compare failed: {e}")
+
+
+@router.get("/sentence-matches/{matching_id}")
+async def get_sentence_level_matches(
+    matching_id: str,
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    문장 단위 매칭 상세 정보 조회
+    - 매칭된 문장들과 유사도 점수 포함
+    - 각 조건별로 어떤 문장이 매칭되었는지 상세 정보 제공
+    """
+    try:
+        svc = MatchingService(db)
+        ids = svc.decode_matching_id(matching_id)
+        if not ids.get("resume_id") or not ids.get("job_id"):
+            raise HTTPException(status_code=404, detail="Invalid matching_id")
+
+        job = db.query(JobPosting).filter(JobPosting.id == ids["job_id"]).first()
+        resume = db.query(Resume).filter(Resume.id == ids["resume_id"]).first()
+        if not job or not resume:
+            raise HTTPException(status_code=404, detail="Job or Resume not found")
+
+        # 문장 단위 매칭 결과 계산
+        result = svc.calculate_matching_score(job, resume, generate_feedback=False)
+        
+        # 문장 단위 매칭 정보 추출
+        sentence_matches = {
+            "required_conditions": [],
+            "preferred_conditions": []
+        }
+        
+        # Required 조건 분석
+        req_analysis = result.matching_evidence.get('required_skills', {}).get('detailed_analysis', [])
+        for analysis in req_analysis:
+            sentence_matches["required_conditions"].append({
+                "condition": analysis.get('condition', ''),
+                "matched": analysis.get('matched', False),
+                "similarity_score": analysis.get('similarity_score', 0.0),
+                "matched_sentence": analysis.get('matched_sentence', ''),
+                "matched_section": analysis.get('matched_section', ''),
+                "match_type": analysis.get('match_type', 'none')
+            })
+        
+        # Preferred 조건 분석
+        pref_analysis = result.matching_evidence.get('preferred_skills', {}).get('detailed_analysis', [])
+        for analysis in pref_analysis:
+            sentence_matches["preferred_conditions"].append({
+                "condition": analysis.get('condition', ''),
+                "matched": analysis.get('matched', False),
+                "similarity_score": analysis.get('similarity_score', 0.0),
+                "matched_sentence": analysis.get('matched_sentence', ''),
+                "matched_section": analysis.get('matched_section', ''),
+                "match_type": analysis.get('match_type', 'none')
+            })
+
+        return {
+            "matching_id": matching_id,
+            "job_title": job.title,
+            "resume_name": resume.file_name,
+            "overall_score": round(float(result.overall_score) * 100, 1),
+            "grade": result.grade,
+            "sentence_matches": sentence_matches,
+            "summary": {
+                "total_required": len(req_analysis),
+                "matched_required": sum(1 for a in req_analysis if a.get('matched')),
+                "total_preferred": len(pref_analysis),
+                "matched_preferred": sum(1 for a in pref_analysis if a.get('matched'))
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/test")

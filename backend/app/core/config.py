@@ -73,15 +73,12 @@ class Settings(BaseSettings):
         "language": 0.025,         # 언어
     }
     
-    # Sectional Weights (55점 기준으로 조정) ⭐ 기본 사용!
+    # Sectional Weights (문장단위 매칭용) - 균형잡힌 가중치
     SECTIONAL_WEIGHTS: dict = {
-        "required": 0.40,          # 자격요건 매칭 (1순위 - 가장 중요)
-        "experience": 0.30,        # 경력 매칭 (2순위 - 매우 중요, 가중치 증가)
-        "overall": 0.20,           # 전체 유사도 (3순위 - 중요)
-        "preferred": 0.08,         # 우대조건 매칭 (4순위 - 보조적)
-        "education": 0.015,        # 학력 (낮은 가중치)
-        "certification": 0.005,    # 자격증 (매우 낮은 가중치)
-        "language": 0.0,           # 언어 (0으로 설정)
+        "required_match": 0.60,    # 자격요건 매칭 (60%)
+        "preferred_match": 0.20,   # 우대조건 매칭 (20%)
+        "experience_match": 0.10,  # 경력 매칭 (10%)
+        "overall_similarity": 0.10, # 전체 유사도 (10%)
     }
     
     # Default Thresholds

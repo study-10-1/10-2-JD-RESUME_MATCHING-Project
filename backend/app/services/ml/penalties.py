@@ -35,7 +35,7 @@ class PenaltyService:
         # 2. 필수 조건 대량 미충족 페널티 (50% 이상 미충족)
         missing_ratio = self.calculate_required_skill_missing_ratio(job, resume)
         if missing_ratio > 0.5:
-            penalty_value = -0.25 * missing_ratio  # 최대 -25%
+            penalty_value = 0.25 * missing_ratio  # 최대 25% 차감
             penalties["required_skill_critical_missing"] = penalty_value
             logger.debug(f"Applied critical missing penalty: {penalty_value:.1%} ({missing_ratio:.0%} missing)")
         

@@ -34,31 +34,39 @@ services:
       timeout: 5s
       retries: 5
 
-  # Embedding Service
+  # Embedding Service (GPU 지원)
   embedding:
     build:
       context: ./embedding-service
-      dockerfile: Dockerfile
-    container_name: auto-match-embedding
+      dockerfile: Dockerfile.gpu  # GPU용 Dockerfile
+    container_name: auto-match-embedding-gpu
     ports:
       - "8001:8001"
     environment:
       - MODEL_NAME=jhgan/ko-sroberta-multitask
+      - CUDA_VISIBLE_DEVICES=0
     volumes:
       - ml_models:/root/.cache/torch
     restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  # Backend API
+  # Backend API (GPU 지원)
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
-    container_name: auto-match-backend
+      dockerfile: Dockerfile.gpu  # GPU용 Dockerfile
+    container_name: auto-match-backend-gpu
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "${BACKEND_PORT:-8000}:8000"
@@ -76,7 +84,7 @@ services:
       - EMBEDDING_SERVICE_URL=http://embedding:8001
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
-      # Cross-encoder 제거됨
+      - CUDA_VISIBLE_DEVICES=0
     volumes:
       - ./backend:/app
       - ./data:/data
@@ -88,10 +96,20 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
 
 volumes:
   postgres_data:
   redis_data:
   ml_models:
   upload_files:
-

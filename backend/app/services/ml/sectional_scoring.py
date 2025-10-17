@@ -83,26 +83,29 @@ class SectionalScoringService:
         job: JobPosting,
         resume: Resume
     ) -> float:
-        """자격요건 매칭 점수"""
+        """자격요건 매칭 점수 - 순수 임베딩 기반"""
         try:
             # 임베딩이 있으면 사용
             if job.required_embedding is not None and resume.skills_embedding is not None:
                 job_req_emb = np.frombuffer(job.required_embedding, dtype=np.float32)
                 resume_skills_emb = np.frombuffer(resume.skills_embedding, dtype=np.float32)
                 
-                # 코사인 유사도
+                # 코사인 유사도 (순수 임베딩 기반)
                 similarity = np.dot(job_req_emb, resume_skills_emb) / (
                     np.linalg.norm(job_req_emb) * np.linalg.norm(resume_skills_emb)
                 )
                 
-                # 키워드 매칭도 함께 고려
+                # 키워드 매칭도 함께 고려 (보조 역할)
                 keyword_score = self._keyword_match(
                     job.requirements.get('required', []) if job.requirements else [],
                     resume.extracted_skills or []
                 )
                 
-                # 임베딩(60%) + 키워드(40%)
-                return float(similarity * 0.6 + keyword_score * 0.4)
+                # 임베딩(80%) + 키워드(20%) - 임베딩 중심으로 전환
+                # 키워드 매칭이 전무할 때는 의미 유사도 과대평가를 방지하기 위해 감쇠(0.3x)
+                if keyword_score == 0:
+                    similarity *= 0.3
+                return float(similarity * 0.8 + keyword_score * 0.2)
             
             # 임베딩이 없으면 키워드만
             else:
@@ -120,7 +123,7 @@ class SectionalScoringService:
         job: JobPosting,
         resume: Resume
     ) -> float:
-        """우대조건 매칭 점수"""
+        """우대조건 매칭 점수 - 순수 임베딩 기반"""
         try:
             if job.preferred_embedding is not None and resume.skills_embedding is not None:
                 job_pref_emb = np.frombuffer(job.preferred_embedding, dtype=np.float32)
@@ -135,7 +138,10 @@ class SectionalScoringService:
                     resume.extracted_skills or []
                 )
                 
-                return float(similarity * 0.6 + keyword_score * 0.4)
+                # 임베딩(80%) + 키워드(20%) - 임베딩 중심으로 전환
+                if keyword_score == 0:
+                    similarity *= 0.3
+                return float(similarity * 0.8 + keyword_score * 0.2)
             
             else:
                 return self._keyword_match(

@@ -7,6 +7,7 @@ from app.models.job import JobPosting
 from app.models.resume import Resume
 from app.models.matching import MatchingResult, MatchingConfig
 from app.models.feedback import LLMFeedback, UserFeedback
+from app.models.sentences import ResumeSentence, JobSentence
 
 __all__ = [
     "User",
@@ -17,5 +18,7 @@ __all__ = [
     "MatchingConfig",
     "LLMFeedback",
     "UserFeedback",
+    "ResumeSentence",
+    "JobSentence",
 ]
 

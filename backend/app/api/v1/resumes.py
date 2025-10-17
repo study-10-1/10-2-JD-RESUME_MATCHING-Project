@@ -29,8 +29,10 @@ def _safe_list(value):
     return value if isinstance(value, list) else []
 
 
+
+
 @router.post("/upload-and-process", response_model=ResumeUploadResponse, status_code=status.HTTP_201_CREATED)
-async def upload_and_process_resume(
+def upload_and_process_resume(
     file: UploadFile = File(...),
     is_primary: bool = Form(False),
     db: Session = Depends(get_db)
@@ -148,50 +150,23 @@ async def upload_and_process_resume(
         db.commit()
         db.refresh(resume)
 
-        # 6) 즉시 임베딩 생성 시도 (안전 가드)
-        has_overall = False
-        has_skills = False
-        has_experience = False
-        has_projects = False
+        # 6) 문장 단위 임베딩만 생성 (최적화)
+        has_sentences = False
 
         try:
-            embedding_service = get_embedding_service()
-
-            # 전체
-            if resume.raw_text and len(resume.raw_text.strip()) >= 10:
-                overall_emb = embedding_service.generate_embedding(resume.raw_text)
-                resume.embedding = overall_emb
-                has_overall = True
-
-            # 섹션별
-            skills_narr = (parsed or {}).get("skills_narrative") or ""
-            projects_narr = (parsed or {}).get("projects_narrative") or ""
-            work_exp = _safe_list((parsed or {}).get("work_experience"))
-            exp_lines = []
-            for it in work_exp:
-                company = (it or {}).get('company') or ''
-                resp = _safe_list((it or {}).get('responsibilities'))
-                line = f"{company}: {', '.join(resp)}".strip(': ').strip()
-                if line:
-                    exp_lines.append(line)
-            exp_narr = "\n".join(exp_lines)
-
-            if len(skills_narr.strip()) >= 10:
-                resume.skills_embedding = embedding_service.generate_embedding(skills_narr)
-                has_skills = True
-            if len(exp_narr.strip()) >= 10:
-                resume.experience_embedding = embedding_service.generate_embedding(exp_narr)
-                has_experience = True
-            if len(projects_narr.strip()) >= 10:
-                resume.projects_embedding = embedding_service.generate_embedding(projects_narr)
-                has_projects = True
+            # 문장 단위 임베딩 생성 (전체/섹션별 임베딩 제거)
+            from app.services.indexing.sentence_indexer import SentenceIndexer
+            sentence_indexer = SentenceIndexer(db)
+            sentence_count = sentence_indexer.index_resume(resume)
+            has_sentences = sentence_count > 0
+            logger.info(f"Indexed {sentence_count} resume sentences (optimized)")
 
             db.add(resume)
             db.commit()
             db.refresh(resume)
-        except Exception as embed_err:
-            # 임베딩 실패해도 파싱 결과는 반환
-            logger.error(f"Embedding inline failed: {embed_err}")
+        except Exception as sent_err:
+            logger.warning(f"Sentence indexing failed: {sent_err}")
+            has_sentences = False
 
         processing_time_ms = int((time.time() - start_time) * 1000)
         return {
@@ -202,10 +177,7 @@ async def upload_and_process_resume(
             "extracted_skills": resume.extracted_skills,
             "extracted_experience_years": resume.extracted_experience_years,
             "processing_time_ms": processing_time_ms,
-            "has_overall": has_overall,
-            "has_skills": has_skills,
-            "has_experience": has_experience,
-            "has_projects": has_projects,
+            "has_sentences": has_sentences,
         }
 
     except HTTPException:
@@ -228,46 +200,21 @@ async def generate_resume_embeddings(
         if not resume:
             raise HTTPException(status_code=404, detail="Resume not found")
 
-        parsed = resume.parsed_data or {}
-        embedding_service = get_embedding_service()
-
-        # 전체 텍스트 임베딩 (텍스트가 충분히 있을 때만)
-        overall_emb = None
-        if resume.raw_text and len(resume.raw_text.strip()) >= 10:
-            overall_emb = embedding_service.generate_embedding(resume.raw_text)
-
-        # 섹션 내러티브 텍스트 준비 (None 안전 처리)
-        skills_narr = parsed.get("skills_narrative") or ""
-        projects_narr = parsed.get("projects_narrative") or ""
-        work_exp = _safe_list(parsed.get("work_experience"))
-        exp_lines = []
-        for it in work_exp:
-            company = (it or {}).get('company') or ''
-            resp = _safe_list((it or {}).get('responsibilities'))
-            exp_lines.append(f"{company}: {', '.join(resp)}")
-        exp_narr = "\n".join([ln for ln in exp_lines if ln.strip()])
-
-        skills_emb = embedding_service.generate_embedding(skills_narr) if len(skills_narr.strip()) >= 10 else None
-        experience_emb = embedding_service.generate_embedding(exp_narr) if len(exp_narr.strip()) >= 10 else None
-        projects_emb = embedding_service.generate_embedding(projects_narr) if len(projects_narr.strip()) >= 10 else None
-
-        # 업데이트
-        resume.embedding = overall_emb
-        resume.embedding_model = settings.EMBEDDING_MODEL
-        resume.skills_embedding = skills_emb
-        resume.experience_embedding = experience_emb
-        resume.projects_embedding = projects_emb
-        db.add(resume)
-        db.commit()
-        db.refresh(resume)
+        # 문장 단위 임베딩만 재생성 (최적화)
+        has_sentences = False
+        try:
+            from app.services.indexing.sentence_indexer import SentenceIndexer
+            sentence_indexer = SentenceIndexer(db)
+            sentence_count = sentence_indexer.index_resume(resume)
+            has_sentences = sentence_count > 0
+            logger.info(f"Re-indexed {sentence_count} resume sentences (optimized)")
+        except Exception as sent_err:
+            logger.warning(f"Sentence re-indexing failed: {sent_err}")
 
         return {
             "resume_id": str(resume.id),
             "updated": True,
-            "has_overall": overall_emb is not None,
-            "has_skills": skills_emb is not None,
-            "has_experience": experience_emb is not None,
-            "has_projects": projects_emb is not None,
+            "has_sentences": has_sentences,
         }
 
     except HTTPException:
@@ -275,6 +222,8 @@ async def generate_resume_embeddings(
     except Exception as e:
         logger.error(f"Embedding generation error: {e}")
         raise HTTPException(status_code=500, detail=f"Embedding generation failed: {e}")
+
+
 
 
  

@@ -83,6 +83,55 @@ class LLMParser:
         except Exception as e:
             logger.error(f"LLM parsing failed: {e}")
             return self._fallback_parsing(raw_text)
+
+    def extract_sentences(self, raw_text: str) -> Dict[str, Any]:
+        """Split text into clean, standalone sentences using LLM; fallback to regex.
+
+        Returns: { "sentences": ["..."] }
+        """
+        if not raw_text:
+            return {"sentences": []}
+        if not self.client:
+            return {"sentences": self._fallback_sentence_split(raw_text)}
+        try:
+            prompt = (
+                "다음 텍스트를 의미 단위의 완전한 문장으로 깔끔하게 분할하세요.\n"
+                "- 각 문장은 20-200자 내외의 의미 있는 단위여야 합니다.\n"
+                "- 기술 스킬, 경험, 프로젝트 내용을 명확히 구분합니다.\n"
+                "- 번호/불릿/불필요한 접두사는 제거합니다.\n"
+                "- 한국어/영어는 원문 어휘를 보존합니다.\n"
+                "- 출력은 JSON {\"sentences\": [..]} 형식만 반환하세요.\n\n"
+                "텍스트:\n```\n" + raw_text[:8000] + "\n```"
+            )
+            completion_params = {
+                "model": self.model,
+                "messages": [
+                    {"role": "system", "content": "문장 분할 전문가로서, 입력을 고품질 문장 리스트로 변환합니다."},
+                    {"role": "user", "content": prompt},
+                ],
+                "response_format": {"type": "json_object"},
+            }
+            if "gpt-5" not in self.model.lower():
+                completion_params["temperature"] = 0.1
+            resp = self.client.chat.completions.create(**completion_params)
+            data = json.loads(resp.choices[0].message.content or "{}")
+            sents = [s.strip() for s in (data.get("sentences") or []) if isinstance(s, str) and s.strip()]
+            if sents:
+                return {"sentences": sents}
+            return {"sentences": self._fallback_sentence_split(raw_text)}
+        except Exception as e:
+            logger.warning(f"extract_sentences failed, fallback: {e}")
+            return {"sentences": self._fallback_sentence_split(raw_text)}
+
+    def _fallback_sentence_split(self, text: str) -> list:
+        import re
+        raw = re.split(r"(?<=[.!?\n])\s+", text)
+        sents = []
+        for s in raw:
+            s = " ".join(s.strip().split())
+            if 20 <= len(s) <= 300 and " " in s and "_" not in s:
+                sents.append(s)
+        return sents
     
     def _create_parsing_prompt(self, text: str) -> str:
         """파싱 프롬프트 생성"""
