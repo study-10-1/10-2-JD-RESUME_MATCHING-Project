@@ -15,6 +15,7 @@ from app.core.config import settings
 from app.services.parsing.pdf_parser import PDFParser
 from app.services.parsing.docx_parser import DOCXParser
 from app.services.parsing.xlsx_parser import XLSXParser
+from app.services.parsing.hwp_parser import HWPParser
 from app.services.parsing.llm_parser import LLMParser
 from app.services.ml.embedding import get_embedding_service
 from app.core.logging import logger
@@ -62,17 +63,23 @@ def upload_and_process_resume(
         file_size = os.path.getsize(disk_path)
         file_type = ext.replace(".", "") or "txt"
 
-        # 3) 텍스트 추출
+        # 3) 텍스트 추출 (모든 페이지/시트 처리)
         if file_type == "pdf":
             raw_text = PDFParser().extract_text(disk_path)
         elif file_type in ("docx", "doc"):
             raw_text = DOCXParser().extract_text(disk_path)
         elif file_type in ("xlsx", "xls"):
             raw_text = XLSXParser().extract_text(disk_path)
+        elif file_type == "hwp":
+            raw_text = HWPParser().extract_text(disk_path)
         else:
             # 기본 텍스트 파일로 처리
             with open(disk_path, "r", encoding="utf-8", errors="ignore") as f:
                 raw_text = f.read()
+        
+        # 파싱 결과 분석
+        pages_count = raw_text.count("--- 페이지") if "--- 페이지" in raw_text else 1
+        sheets_count = raw_text.count("--- 시트:") if "--- 시트:" in raw_text else 1
 
         # 4) LLM 파싱 및 핵심 정보 추출
         # raw_text가 비었거나 매우 짧으면 파싱/임베딩 생략
@@ -108,6 +115,9 @@ def upload_and_process_resume(
                 "extracted_skills": [],
                 "extracted_experience_years": 0,
                 "processing_time_ms": processing_time_ms,
+                "parsed_pages": pages_count,
+                "parsed_sheets": sheets_count,
+                "total_text_length": len(raw_text),
                 "message": "empty_text_skipped",
             }
 
@@ -177,6 +187,9 @@ def upload_and_process_resume(
             "extracted_skills": resume.extracted_skills,
             "extracted_experience_years": resume.extracted_experience_years,
             "processing_time_ms": processing_time_ms,
+            "parsed_pages": pages_count,
+            "parsed_sheets": sheets_count,
+            "total_text_length": len(raw_text),
             "has_sentences": has_sentences,
         }
 

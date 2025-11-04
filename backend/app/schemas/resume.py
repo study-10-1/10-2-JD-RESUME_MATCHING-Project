@@ -57,6 +57,9 @@ class ResumeUploadResponse(BaseModel):
     extracted_skills: Optional[List[str]] = None
     extracted_experience_years: Optional[int] = None
     processing_time_ms: int
+    parsed_pages: Optional[int] = None  # PDF 페이지 수
+    parsed_sheets: Optional[int] = None  # XLSX 시트 수
+    total_text_length: Optional[int] = None  # 전체 텍스트 길이
 
 
 class ResumeListResponse(BaseModel):

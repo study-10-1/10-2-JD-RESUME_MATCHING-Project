@@ -1,0 +1,44 @@
+{
+  "spring": {
+    "current_threshold": 0.6,
+    "recommended_threshold": 0.6380667686462402,
+    "difference": 0.03806676864624026,
+    "data_points": 1936,
+    "match_rate": 0.49173553719008267
+  },
+  "react": {
+    "current_threshold": 0.6,
+    "recommended_threshold": 0.6614971160888672,
+    "difference": 0.06149711608886721,
+    "data_points": 968,
+    "match_rate": 0.7386363636363636
+  },
+  "database": {
+    "current_threshold": 0.55,
+    "recommended_threshold": 0.6123917102813721,
+    "difference": 0.062391710281372026,
+    "data_points": 1452,
+    "match_rate": 0.17768595041322313
+  },
+  "api": {
+    "current_threshold": 0.6,
+    "recommended_threshold": 0.6313334703445435,
+    "difference": 0.03133347034454348,
+    "data_points": 2420,
+    "match_rate": 0.5574380165289257
+  },
+  "python": {
+    "current_threshold": 0.58,
+    "recommended_threshold": 0.613622784614563,
+    "difference": 0.03362278461456303,
+    "data_points": 1452,
+    "match_rate": 0.16460055096418733
+  },
+  "cloud": {
+    "current_threshold": 0.62,
+    "recommended_threshold": 0.6513033509254456,
+    "difference": 0.03130335092544556,
+    "data_points": 968,
+    "match_rate": 0.45661157024793386
+  }
+}

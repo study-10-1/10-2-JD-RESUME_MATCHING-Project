@@ -36,6 +36,11 @@ PyMuPDF==1.23.7
 python-docx==1.1.0
 PyPDF2==3.0.1
 openpyxl==3.1.2
+pdfplumber==0.10.3  # PDF 파싱 개선용
+olefile==0.46  # HWP 파일 파싱용
+# python-docx2txt  # 더 정확한 DOCX 파싱 (설치 실패)
+# mammoth  # DOCX를 HTML로 변환 후 파싱 (설치 실패)
+# python-docx2pdf  # DOCX를 PDF로 변환 (설치 실패)
 
 # LLM Integration
 openai==1.12.0  # 최신 버전으로 업데이트

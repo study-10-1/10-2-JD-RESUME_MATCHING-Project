@@ -246,14 +246,29 @@ class MatchingService:
             for cat in category_scores.values()
         )
         
+        logger.info(
+            f"Weighted components: required={category_scores['required_match']['score']:.3f}*{category_scores['required_match']['weight']:.2f}, "
+            f"preferred={category_scores['preferred_match']['score']:.3f}*{category_scores['preferred_match']['weight']:.2f}, "
+            f"experience={category_scores['experience_match']['score']:.3f}*{category_scores['experience_match']['weight']:.2f}, "
+            f"overall={category_scores['overall_similarity']['score']:.3f}*{category_scores['overall_similarity']['weight']:.2f} → sum={weighted_sum:.3f}"
+        )
+        
         # 6. 자격요건 매칭 실패 시 50% 감점 (엄격성 강화)
+        dampened = False
         if required_score["score"] < 0.5:  # 50% 미만이면 실패로 간주
+            weighted_sum_before = weighted_sum
             weighted_sum *= 0.5  # 50% 감점
+            dampened = True
+            logger.info(f"Dampening applied (required<{0.5}): {weighted_sum_before:.3f} → {weighted_sum:.3f}")
+        else:
+            logger.info("No dampening (required>=0.5)")
         
         # 7. 페널티 계산
         penalties = self.penalty.calculate_penalties(job, resume)
         penalty_sum = sum(penalties.values())
+        logger.info(f"Penalties: {penalties} (sum={penalty_sum:.3f})")
         final_score = max(0.0, weighted_sum - penalty_sum)
+        logger.info(f"Final score: max(0, {weighted_sum:.3f} - {penalty_sum:.3f}) = {final_score:.3f}")
         
         # 8. 등급 부여
         grade = self._assign_grade(final_score)
@@ -267,6 +282,18 @@ class MatchingService:
                 "required_embedding": category_scores.get("required_match", {}).get("score", 0),
                 "preferred_embedding": category_scores.get("preferred_match", {}).get("score", 0),
                 "experience_embedding": category_scores.get("experience_match", {}).get("score", 0)
+            },
+            "_debug": {
+                "raw_weighted_sum": float(
+                    category_scores['required_match']['score'] * category_scores['required_match']['weight'] +
+                    category_scores['preferred_match']['score'] * category_scores['preferred_match']['weight'] +
+                    category_scores['experience_match']['score'] * category_scores['experience_match']['weight'] +
+                    category_scores['overall_similarity']['score'] * category_scores['overall_similarity']['weight']
+                ),
+                "dampened": bool(dampened),
+                "weighted_after_dampening": float(weighted_sum),
+                "penalty_sum": float(penalty_sum),
+                "final_score": float(final_score)
             }
         }
         
@@ -322,29 +349,29 @@ class MatchingService:
         """조건별 동적 임계값 설정"""
         condition_lower = condition.lower()
         
-        # 기술 스택별 세분화된 임계값 (실제 테스트 결과 기반 최적화)
+        # 기술 스택별 세분화된 임계값 (종합 분석 결과 기반 최적화 - 완전판)
         tech_thresholds = {
-            # 백엔드 기술 스택 (충돌 방지 - 매우 엄격)
-            'java': 0.75, 'kotlin': 0.75, 'spring': 0.75,
-            'python': 0.62, 'fastapi': 0.62, 'django': 0.62,  # 약간 완화
-            'node.js': 0.70, 'express': 0.70,
+            # 백엔드 기술 스택 (종합 분석 결과 기반 최적화)
+            'java': 0.64, 'kotlin': 0.64, 'spring': 0.64,  # 0.60 → 0.64 (분석 결과: 0.638 추천)
+            'python': 0.61, 'fastapi': 0.61, 'django': 0.61,  # 0.58 → 0.61 (분석 결과: 0.614 추천)
+            'node.js': 0.62, 'express': 0.62,  # 유지
             
-            # 프론트엔드 기술 스택 (충돌 방지 - 매우 엄격)
-            'react': 0.75, 'next.js': 0.75, 'typescript': 0.75,
-            'vue.js': 0.70, 'angular': 0.70,
-            'flutter': 0.70,
+            # 프론트엔드 기술 스택 (종합 분석 결과 기반 최적화)
+            'react': 0.66, 'next.js': 0.66, 'typescript': 0.66,  # 0.60 → 0.66 (분석 결과: 0.661 추천)
+            'vue.js': 0.62, 'angular': 0.62,  # 유지
+            'flutter': 0.62,  # 유지
             
-            # 모바일 개발 (충돌 방지 - 매우 엄격)
-            'android': 0.75, 'ios': 0.75,
+            # 모바일 개발 (현재 적절)
+            'android': 0.70, 'ios': 0.70,  # 유지
             
-            # 데이터베이스 (더 완화)
-            'mysql': 0.55, 'postgresql': 0.55, 'mongodb': 0.55,
+            # 데이터베이스 (종합 분석 결과 기반 최적화)
+            'mysql': 0.61, 'postgresql': 0.61, 'mongodb': 0.61,  # 0.55 → 0.61 (분석 결과: 0.612 추천)
             
-            # 클라우드/인프라 (현재 적절)
-            'aws': 0.65, 'gcp': 0.65, 'azure': 0.65,
-            'docker': 0.65, 'kubernetes': 0.70,
+            # 클라우드/인프라 (종합 분석 결과 기반 최적화)
+            'aws': 0.65, 'gcp': 0.65, 'azure': 0.65,  # 0.62 → 0.65 (분석 결과: 0.651 추천)
+            'docker': 0.58, 'kubernetes': 0.65,  # 유지
             
-            # AI/ML (완화)
+            # AI/ML (유지)
             'tensorflow': 0.62, 'pytorch': 0.62, 'opencv': 0.62,
             'langchain': 0.62, 'langgraph': 0.62
         }

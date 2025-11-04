@@ -11,7 +11,7 @@ class PDFParser:
     
     def extract_text(self, file_path: str) -> str:
         """
-        PDF 파일에서 텍스트 추출
+        PDF 파일에서 텍스트 추출 (모든 페이지 처리)
         
         Args:
             file_path: PDF 파일 경로
@@ -19,21 +19,34 @@ class PDFParser:
         Returns:
             추출된 텍스트
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         try:
             doc = fitz.open(file_path)
             text = ""
+            total_pages = len(doc)
             
-            for page in doc:
-                text += page.get_text()
+            logger.info(f"PDF 총 페이지 수: {total_pages}")
+            
+            for page_num in range(total_pages):
+                page = doc[page_num]
+                page_text = page.get_text()
+                if page_text.strip():
+                    text += f"\n--- 페이지 {page_num + 1} ---\n"
+                    text += page_text + "\n"
+                    logger.info(f"페이지 {page_num + 1} 파싱 완료: {len(page_text)} 문자")
             
             doc.close()
             
             # 텍스트 정리
             text = self._clean_text(text)
             
+            logger.info(f"PDF 전체 파싱 완료: {len(text)} 문자")
             return text
             
         except Exception as e:
+            logger.error(f"PDF 텍스트 추출 실패: {e}")
             raise Exception(f"PDF 텍스트 추출 실패: {e}")
     
     def _clean_text(self, text: str) -> str:

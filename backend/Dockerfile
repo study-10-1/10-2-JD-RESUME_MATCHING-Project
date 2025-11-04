@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     git \
     libgomp1 \
+    libreoffice \
     && rm -rf /var/lib/apt/lists/*
 
 # Set environment variables to prevent segfault
