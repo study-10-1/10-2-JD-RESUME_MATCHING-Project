@@ -46,39 +46,41 @@ class LLMParser:
             return self._fallback_parsing(raw_text)
         
         try:
-            # 텍스트가 너무 길면 앞부분만 (토큰 제한)
+            # 텍스트가 길면 청크로 나눠서 처리
             max_chars = 8000
-            text_to_parse = raw_text[:max_chars] if len(raw_text) > max_chars else raw_text
-            
-            prompt = self._create_parsing_prompt(text_to_parse)
-            
-            # API 호출 파라미터 구성
-            completion_params = {
-                "model": self.model,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "당신은 이력서 분석 전문가입니다. 주어진 이력서에서 정확하게 정보를 추출하여 JSON 형식으로 반환합니다."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                "response_format": {"type": "json_object"}
-            }
-            
-            # GPT-5가 아닌 경우에만 temperature 설정
-            if "gpt-5" not in self.model.lower():
-                completion_params["temperature"] = 0.1
-            
-            response = self.client.chat.completions.create(**completion_params)
-            
-            result_text = response.choices[0].message.content
-            parsed_data = json.loads(result_text)
-            
-            logger.info(f"LLM parsing successful. Model: {self.model}")
-            return parsed_data
+            if len(raw_text) <= max_chars:
+                # 짧은 텍스트는 그대로 처리
+                text_to_parse = raw_text
+                prompt = self._create_parsing_prompt(text_to_parse)
+                
+                completion_params = {
+                    "model": self.model,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "당신은 이력서 분석 전문가입니다. 주어진 이력서에서 정확하게 정보를 추출하여 JSON 형식으로 반환합니다."
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    "response_format": {"type": "json_object"}
+                }
+                
+                if "gpt-5" not in self.model.lower():
+                    completion_params["temperature"] = 0.1
+                
+                response = self.client.chat.completions.create(**completion_params)
+                result_text = response.choices[0].message.content
+                parsed_data = json.loads(result_text)
+                
+                logger.info(f"LLM parsing successful. Model: {self.model}")
+                return parsed_data
+            else:
+                # 긴 텍스트는 청크로 나눠서 처리
+                logger.info(f"Text too long ({len(raw_text)} chars), processing in chunks...")
+                return self._parse_resume_in_chunks(raw_text, max_chars)
             
         except Exception as e:
             logger.error(f"LLM parsing failed: {e}")
@@ -227,6 +229,149 @@ JSON 형식:
 - 이 두 필드는 임베딩 생성에 사용되므로 반드시 포함
 """
     
+    def _parse_resume_in_chunks(self, raw_text: str, chunk_size: int = 8000) -> Dict[str, Any]:
+        """긴 텍스트를 청크로 나눠서 파싱 후 병합"""
+        # 첫 번째 청크: 전체 구조 파악 (개인정보, 요약 등)
+        first_chunk = raw_text[:chunk_size]
+        prompt = self._create_parsing_prompt(first_chunk)
+        
+        completion_params = {
+            "model": self.model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "당신은 이력서 분석 전문가입니다. 주어진 이력서에서 정확하게 정보를 추출하여 JSON 형식으로 반환합니다."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "response_format": {"type": "json_object"}
+        }
+        
+        if "gpt-5" not in self.model.lower():
+            completion_params["temperature"] = 0.1
+        
+        try:
+            response = self.client.chat.completions.create(**completion_params)
+            result_text = response.choices[0].message.content
+            merged_data = json.loads(result_text)
+            
+            # 나머지 청크 처리 (경력, 프로젝트 등 상세 정보)
+            remaining_text = raw_text[chunk_size:]
+            chunks = []
+            if remaining_text:
+                # 나머지 텍스트를 청크로 나눔
+                chunks = [remaining_text[i:i+chunk_size] for i in range(0, len(remaining_text), chunk_size)]
+                
+                for i, chunk in enumerate(chunks):
+                    if i >= 3:  # 최대 3개 청크만 추가 처리 (비용 절감)
+                        logger.warning(f"Skipping remaining chunks (processed {i+1} chunks)")
+                        break
+                    
+                    # 상세 정보 추출 프롬프트
+                    detail_prompt = f"""
+다음은 이력서의 추가 부분입니다. 이전에 추출한 정보에 추가하여 경력, 프로젝트, 스킬 등의 상세 정보를 추출하세요.
+
+추가 텍스트:
+```
+{chunk}
+```
+
+이전에 추출한 정보:
+- 경력: {len(merged_data.get('work_experience', []))}개
+- 프로젝트: {len(merged_data.get('projects', []))}개
+- 스킬: {len(merged_data.get('skills', {}).get('programming_languages', []))}개
+
+JSON 형식으로 반환하되, 이전 정보에 **추가**되는 정보만 포함하세요.
+리스트 필드(work_experience, projects, skills 등)는 이전 항목에 새로운 항목을 추가하세요.
+"""
+                    
+                    detail_params = {
+                        "model": self.model,
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": "당신은 이력서 분석 전문가입니다. 주어진 이력서의 추가 부분에서 상세 정보를 추출하여 JSON 형식으로 반환합니다."
+                            },
+                            {
+                                "role": "user",
+                                "content": detail_prompt
+                            }
+                        ],
+                        "response_format": {"type": "json_object"}
+                    }
+                    
+                    if "gpt-5" not in self.model.lower():
+                        detail_params["temperature"] = 0.1
+                    
+                    try:
+                        detail_response = self.client.chat.completions.create(**detail_params)
+                        detail_text = detail_response.choices[0].message.content
+                        detail_data = json.loads(detail_text)
+                        
+                        # 결과 병합
+                        merged_data = self._merge_parsed_data(merged_data, detail_data)
+                        logger.info(f"Processed chunk {i+2}, merged additional data")
+                    except Exception as e:
+                        logger.warning(f"Failed to process chunk {i+2}: {e}")
+                        continue
+            
+            num_chunks = 1 + min(len(chunks) if remaining_text else 0, 3)
+            logger.info(f"LLM parsing successful (chunked). Model: {self.model}, chunks: {num_chunks}")
+            return merged_data
+            
+        except Exception as e:
+            logger.error(f"Chunked parsing failed: {e}")
+            return self._fallback_parsing(raw_text)
+    
+    def _merge_parsed_data(self, base: Dict[str, Any], additional: Dict[str, Any]) -> Dict[str, Any]:
+        """파싱된 데이터 병합 (리스트는 extend, 딕셔너리는 merge)"""
+        merged = base.copy()
+        
+        # 리스트 필드: extend
+        list_fields = ['work_experience', 'education', 'certifications', 'languages', 'projects']
+        for field in list_fields:
+            base_list = merged.get(field, [])
+            add_list = additional.get(field, [])
+            if isinstance(base_list, list) and isinstance(add_list, list):
+                merged[field] = base_list + add_list
+        
+        # 딕셔너리 필드: merge
+        dict_fields = ['personal_info', 'skills']
+        for field in dict_fields:
+            base_dict = merged.get(field, {})
+            add_dict = additional.get(field, {})
+            if isinstance(base_dict, dict) and isinstance(add_dict, dict):
+                if field == 'skills':
+                    # skills는 중첩 딕셔너리
+                    for key in add_dict:
+                        if key in base_dict and isinstance(base_dict[key], list) and isinstance(add_dict[key], list):
+                            base_dict[key].extend(add_dict[key])
+                        elif key not in base_dict:
+                            base_dict[key] = add_dict[key]
+                else:
+                    base_dict.update(add_dict)
+                merged[field] = base_dict
+        
+        # 문자열 필드: 더 긴 것으로 선택 (또는 병합)
+        string_fields = ['summary']
+        for field in string_fields:
+            base_str = merged.get(field, "")
+            add_str = additional.get(field, "")
+            if add_str and len(add_str) > len(base_str):
+                merged[field] = add_str
+        
+        # 숫자 필드: 최대값 선택
+        if 'total_experience_years' in additional:
+            merged['total_experience_years'] = max(
+                merged.get('total_experience_years', 0),
+                additional.get('total_experience_years', 0)
+            )
+        
+        return merged
+    
     def _fallback_parsing(self, raw_text: str) -> Dict[str, Any]:
         """LLM 실패 시 기본 파싱"""
         return {
@@ -338,39 +483,41 @@ JSON 형식:
             return self._fallback_job_parsing(raw_text)
         
         try:
-            # 텍스트가 너무 길면 앞부분만 (토큰 제한)
+            # 텍스트가 길면 청크로 나눠서 처리
             max_chars = 8000
-            text_to_parse = raw_text[:max_chars] if len(raw_text) > max_chars else raw_text
-            
-            prompt = self._create_job_parsing_prompt(text_to_parse, title)
-            
-            # API 호출 파라미터 구성
-            completion_params = {
-                "model": self.model,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "당신은 채용공고 분석 전문가입니다. 주어진 채용공고에서 정확하게 정보를 추출하여 JSON 형식으로 반환합니다."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                "response_format": {"type": "json_object"}
-            }
-            
-            # GPT-5가 아닌 경우에만 temperature 설정
-            if "gpt-5" not in self.model.lower():
-                completion_params["temperature"] = 0.1
-            
-            response = self.client.chat.completions.create(**completion_params)
-            
-            result_text = response.choices[0].message.content
-            parsed_data = json.loads(result_text)
-            
-            logger.info(f"Job posting LLM parsing successful. Model: {self.model}")
-            return parsed_data
+            if len(raw_text) <= max_chars:
+                # 짧은 텍스트는 그대로 처리
+                text_to_parse = raw_text
+                prompt = self._create_job_parsing_prompt(text_to_parse, title)
+                
+                completion_params = {
+                    "model": self.model,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "당신은 채용공고 분석 전문가입니다. 주어진 채용공고에서 정확하게 정보를 추출하여 JSON 형식으로 반환합니다."
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    "response_format": {"type": "json_object"}
+                }
+                
+                if "gpt-5" not in self.model.lower():
+                    completion_params["temperature"] = 0.1
+                
+                response = self.client.chat.completions.create(**completion_params)
+                result_text = response.choices[0].message.content
+                parsed_data = json.loads(result_text)
+                
+                logger.info(f"Job posting LLM parsing successful. Model: {self.model}")
+                return parsed_data
+            else:
+                # 긴 텍스트는 청크로 나눠서 처리
+                logger.info(f"Job text too long ({len(raw_text)} chars), processing in chunks...")
+                return self._parse_job_in_chunks(raw_text, title, max_chars)
             
         except Exception as e:
             logger.error(f"Job posting LLM parsing failed: {e}")
@@ -441,6 +588,140 @@ JSON 형식:
 - required, preferred는 반드시 완전한 문장으로 작성!
 - 이 데이터는 섹션별 임베딩 생성에 사용됨
 """
+    
+    def _parse_job_in_chunks(self, raw_text: str, title: str, chunk_size: int = 8000) -> Dict[str, Any]:
+        """긴 공고 텍스트를 청크로 나눠서 파싱 후 병합"""
+        # 첫 번째 청크: 전체 구조 파악
+        first_chunk = raw_text[:chunk_size]
+        prompt = self._create_job_parsing_prompt(first_chunk, title)
+        
+        completion_params = {
+            "model": self.model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "당신은 채용공고 분석 전문가입니다. 주어진 채용공고에서 정확하게 정보를 추출하여 JSON 형식으로 반환합니다."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "response_format": {"type": "json_object"}
+        }
+        
+        if "gpt-5" not in self.model.lower():
+            completion_params["temperature"] = 0.1
+        
+        try:
+            response = self.client.chat.completions.create(**completion_params)
+            result_text = response.choices[0].message.content
+            merged_data = json.loads(result_text)
+            
+            # 나머지 청크 처리
+            remaining_text = raw_text[chunk_size:]
+            chunks = []
+            if remaining_text:
+                chunks = [remaining_text[i:i+chunk_size] for i in range(0, len(remaining_text), chunk_size)]
+                
+                for i, chunk in enumerate(chunks):
+                    if i >= 2:  # 최대 2개 청크만 추가 처리 (공고는 보통 짧음)
+                        logger.warning(f"Skipping remaining chunks (processed {i+1} chunks)")
+                        break
+                    
+                    # 상세 정보 추출 프롬프트
+                    detail_prompt = f"""
+다음은 채용공고의 추가 부분입니다. 이전에 추출한 정보에 추가하여 자격요건, 우대사항, 업무 내용 등의 상세 정보를 추출하세요.
+
+추가 텍스트:
+```
+{chunk}
+```
+
+이전에 추출한 정보:
+- 자격요건: {len(merged_data.get('requirements', {}).get('required', []))}개
+- 우대사항: {len(merged_data.get('requirements', {}).get('preferred', []))}개
+- 주요 업무: {len(merged_data.get('responsibilities', []))}개
+
+JSON 형식으로 반환하되, 이전 정보에 **추가**되는 정보만 포함하세요.
+리스트 필드(required, preferred, responsibilities, benefits 등)는 이전 항목에 새로운 항목을 추가하세요.
+"""
+                    
+                    detail_params = {
+                        "model": self.model,
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": "당신은 채용공고 분석 전문가입니다. 주어진 채용공고의 추가 부분에서 상세 정보를 추출하여 JSON 형식으로 반환합니다."
+                            },
+                            {
+                                "role": "user",
+                                "content": detail_prompt
+                            }
+                        ],
+                        "response_format": {"type": "json_object"}
+                    }
+                    
+                    if "gpt-5" not in self.model.lower():
+                        detail_params["temperature"] = 0.1
+                    
+                    try:
+                        detail_response = self.client.chat.completions.create(**detail_params)
+                        detail_text = detail_response.choices[0].message.content
+                        detail_data = json.loads(detail_text)
+                        
+                        # 결과 병합
+                        merged_data = self._merge_job_parsed_data(merged_data, detail_data)
+                        logger.info(f"Processed job chunk {i+2}, merged additional data")
+                    except Exception as e:
+                        logger.warning(f"Failed to process job chunk {i+2}: {e}")
+                        continue
+            
+            num_chunks = 1 + min(len(chunks) if remaining_text else 0, 2)
+            logger.info(f"Job posting LLM parsing successful (chunked). Model: {self.model}, chunks: {num_chunks}")
+            return merged_data
+            
+        except Exception as e:
+            logger.error(f"Chunked job parsing failed: {e}")
+            return self._fallback_job_parsing(raw_text)
+    
+    def _merge_job_parsed_data(self, base: Dict[str, Any], additional: Dict[str, Any]) -> Dict[str, Any]:
+        """공고 파싱된 데이터 병합"""
+        merged = base.copy()
+        
+        # requirements 딕셔너리 병합
+        if 'requirements' in additional:
+            if 'requirements' not in merged:
+                merged['requirements'] = {'required': [], 'preferred': []}
+            
+            base_req = merged['requirements']
+            add_req = additional['requirements']
+            
+            # required 리스트 extend
+            if 'required' in add_req and isinstance(add_req['required'], list):
+                base_req['required'] = (base_req.get('required', []) or []) + add_req['required']
+            
+            # preferred 리스트 extend
+            if 'preferred' in add_req and isinstance(add_req['preferred'], list):
+                base_req['preferred'] = (base_req.get('preferred', []) or []) + add_req['preferred']
+        
+        # 리스트 필드: extend
+        list_fields = ['responsibilities', 'benefits']
+        for field in list_fields:
+            base_list = merged.get(field, [])
+            add_list = additional.get(field, [])
+            if isinstance(base_list, list) and isinstance(add_list, list):
+                merged[field] = base_list + add_list
+        
+        # 문자열 필드: 더 긴 것으로 선택
+        string_fields = ['description']
+        for field in string_fields:
+            base_str = merged.get(field, "")
+            add_str = additional.get(field, "")
+            if add_str and len(add_str) > len(base_str):
+                merged[field] = add_str
+        
+        return merged
     
     def _fallback_job_parsing(self, raw_text: str) -> Dict[str, Any]:
         """LLM 실패 시 기본 공고 파싱"""

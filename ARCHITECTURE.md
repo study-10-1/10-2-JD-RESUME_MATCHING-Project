@@ -1,7 +1,7 @@
 # 프로젝트 아키텍처 및 DB 스키마 문서
 
-**최종 업데이트**: 2025-10-17  
-**버전**: 3.0  
+**최종 업데이트**: 2025-11-14  
+**버전**: 3.1  
 **작성자**: AI Matching System Team
 
 ---
@@ -91,67 +91,138 @@ AI 기반 채용 공고-이력서 자동 매칭 시스템
 
 ```
 Project1/
-├── backend/                      # 백엔드 서비스
-│   ├── app/
-│   │   ├── main.py              # FastAPI 앱 진입점
-│   │   ├── core/
-│   │   │   ├── config.py        # 설정 (가중치, 임계값)
-│   │   │   └── database.py      # DB 연결
-│   │   ├── models/              # SQLAlchemy 모델
-│   │   │   ├── user.py
-│   │   │   ├── company.py
-│   │   │   ├── job.py           # 채용 공고
-│   │   │   ├── resume.py        # 이력서
-│   │   │   └── matching.py      # 매칭 결과
-│   │   ├── schemas/             # Pydantic 스키마
-│   │   ├── api/                 # API 라우터
-│   │   │   └── v1/
-│   │   │       ├── auth.py
-│   │   │       ├── jobs.py
-│   │   │       ├── resumes.py
-│   │   │       ├── matching.py
-│   │   │       └── feedback.py
-│   │   ├── services/            # 비즈니스 로직
-│   │   │   ├── matching_service.py
-│   │   │   ├── ml/
-│   │   │   │   ├── embedding.py
-│   │   │   │   ├── vector_search.py
-│   │   │   │   ├── scoring.py
-│   │   │   │   ├── sectional_scoring.py
-│   │   │   │   ├── penalties.py
-│   │   │   │   └── feedback_generator.py
-│   │   │   └── parsing/
-│   │   │       ├── pdf_parser.py
-│   │   │       ├── docx_parser.py
-│   │   │       ├── xlsx_parser.py
-│   │   │       └── llm_parser.py
-│   │   └── repositories/        # DB 접근 계층
-│   ├── alembic/                 # DB 마이그레이션
-│   ├── scripts/                 # 유틸리티 스크립트
-│   │   ├── process_resumes.py
-│   │   ├── insert_job_data.py
-│   │   ├── generate_embeddings.py
-│   │   ├── tune_weights.py
-│   │   └── validate_all_matching.py
-│   ├── Dockerfile
-│   └── requirements.txt
+├── backend/                                    # 백엔드 서비스 (FastAPI)
+│   ├── app/                                    # 애플리케이션 메인 디렉토리
+│   │   ├── __init__.py                        # 패키지 초기화
+│   │   ├── main.py                            # FastAPI 앱 진입점 (라우터 등록, 미들웨어 설정)
+│   │   ├── dependencies.py                    # 공통 의존성 (DB 세션, 인증 등)
+│   │   │
+│   │   ├── core/                              # 핵심 설정 및 인프라
+│   │   │   ├── __init__.py
+│   │   │   ├── config.py                      # 설정 관리 (가중치, 임계값, 환경변수)
+│   │   │   ├── database.py                    # PostgreSQL + pgvector 연결 관리
+│   │   │   ├── logging.py                     # 로깅 설정 (매칭 과정 추적)
+│   │   │   ├── security.py                    # JWT 인증, 비밀번호 해싱
+│   │   │   ├── cache.py                       # Redis 캐싱 유틸리티
+│   │   │   └── storage.py                     # 파일 저장소 (로컬/S3)
+│   │   │
+│   │   ├── models/                            # SQLAlchemy ORM 모델 (DB 스키마)
+│   │   │   ├── __init__.py
+│   │   │   ├── user.py                        # 사용자 모델 (이메일, 비밀번호, 프로필)
+│   │   │   ├── company.py                     # 회사 모델 (회사명, 산업, 규모)
+│   │   │   ├── job.py                         # 채용 공고 모델 (제목, 설명, 임베딩, 섹션별 임베딩)
+│   │   │   ├── resume.py                      # 이력서 모델 (파일 정보, 파싱 데이터, 임베딩)
+│   │   │   ├── sentences.py                   # 문장 단위 임베딩 모델 (resume_sentence, job_sentence)
+│   │   │   ├── matching.py                    # 매칭 결과 모델 (참고용, 실제로는 실시간 계산)
+│   │   │   └── feedback.py                    # LLM 피드백 모델
+│   │   │
+│   │   ├── schemas/                           # Pydantic 스키마 (API 요청/응답 검증)
+│   │   │   ├── __init__.py
+│   │   │   ├── user.py                        # 사용자 관련 스키마
+│   │   │   ├── job.py                         # 채용 공고 스키마
+│   │   │   ├── resume.py                      # 이력서 스키마 (업로드 응답 포함)
+│   │   │   ├── matching.py                    # 매칭 결과 스키마
+│   │   │   └── feedback.py                    # 피드백 스키마
+│   │   │
+│   │   ├── api/                               # API 라우터 (RESTful 엔드포인트)
+│   │   │   ├── __init__.py
+│   │   │   └── v1/                            # API 버전 1
+│   │   │       ├── __init__.py                # v1 라우터 등록
+│   │   │       ├── auth.py                    # 인증 엔드포인트 (로그인, 회원가입)
+│   │   │       ├── users.py                   # 사용자 관리 엔드포인트
+│   │   │       ├── jobs.py                    # 채용 공고 CRUD 엔드포인트
+│   │   │       ├── resumes.py                 # 이력서 업로드/조회 엔드포인트 (파일 파싱, 임베딩 생성)
+│   │   │       ├── matching.py               # 매칭 검색 엔드포인트 (이력서-공고 매칭)
+│   │   │       └── feedback.py               # LLM 피드백 엔드포인트 (on-demand)
+│   │   │
+│   │   ├── services/                          # 비즈니스 로직 계층
+│   │   │   ├── __init__.py
+│   │   │   ├── matching_service.py           # 매칭 서비스 (핵심 로직: 문장 단위 매칭, 동적 임계값)
+│   │   │   ├── job_service.py                # 채용 공고 서비스 (CRUD, 임베딩 생성)
+│   │   │   ├── resume_service.py             # 이력서 서비스 (파일 처리, 파싱, 임베딩)
+│   │   │   ├── auth_service.py               # 인증 서비스 (JWT 토큰 생성/검증)
+│   │   │   ├── feedback_service.py           # 피드백 서비스 (LLM 연동)
+│   │   │   │
+│   │   │   ├── ml/                           # 머신러닝 관련 서비스
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── embedding.py              # 임베딩 생성 서비스 (ko-sroberta-multitask)
+│   │   │   │   ├── vector_search.py          # 벡터 유사도 검색 (pgvector)
+│   │   │   │   ├── scoring.py                # 점수 계산 (학력, 자격증, 언어 등)
+│   │   │   │   ├── sectional_scoring.py      # 섹션별 점수 계산 (문장 단위 매칭)
+│   │   │   │   ├── penalties.py              # 페널티 계산 (경력 불일치, 필수 스킬 부족)
+│   │   │   │   └── feedback_generator.py     # GPT-4 피드백 생성
+│   │   │   │
+│   │   │   ├── parsing/                      # 문서 파싱 서비스
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── pdf_parser.py             # PDF 파서 (PyMuPDF, 모든 페이지 처리)
+│   │   │   │   ├── docx_parser.py            # DOCX 파서 (python-docx, LibreOffice 변환 지원)
+│   │   │   │   ├── xlsx_parser.py            # XLSX 파서 (openpyxl, 모든 시트 처리)
+│   │   │   │   ├── hwp_parser.py             # HWP 파서 (olefile, 페이지 추정)
+│   │   │   │   └── llm_parser.py             # LLM 기반 구조화 파서 (GPT-4, 청크 처리 지원)
+│   │   │   │
+│   │   │   ├── llm/                          # LLM 관련 유틸리티
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── openai_client.py          # OpenAI API 클라이언트
+│   │   │   │   └── prompt_templates.py      # 프롬프트 템플릿 (파싱, 피드백)
+│   │   │   │
+│   │   │   └── indexing/                     # 인덱싱 서비스
+│   │   │       ├── __init__.py
+│   │   │       └── sentence_indexer.py       # 문장 단위 임베딩 인덱싱
+│   │   │
+│   │   ├── repositories/                     # 데이터 접근 계층 (Repository 패턴)
+│   │   │   ├── __init__.py
+│   │   │   ├── user_repository.py            # 사용자 데이터 접근
+│   │   │   ├── job_repository.py             # 채용 공고 데이터 접근
+│   │   │   ├── resume_repository.py          # 이력서 데이터 접근
+│   │   │   └── matching_repository.py        # 매칭 결과 데이터 접근 (참고용)
+│   │   │
+│   │   ├── utils/                            # 유틸리티 함수
+│   │   │   ├── __init__.py
+│   │   │   ├── helpers.py                    # 헬퍼 함수 (날짜, 문자열 처리)
+│   │   │   └── validators.py                 # 검증 함수 (이메일, 파일 확장자)
+│   │   │
+│   │   └── workers/                          # 백그라운드 작업 (Celery 준비)
+│   │       ├── __init__.py
+│   │       └── tasks/                        # 비동기 작업 정의
+│   │           └── __init__.py
+│   │
+│   ├── alembic/                               # DB 마이그레이션 (Alembic)
+│   │   ├── env.py                            # Alembic 환경 설정
+│   │   ├── script.py.mako                    # 마이그레이션 스크립트 템플릿
+│   │   └── versions/                         # 마이그레이션 버전 히스토리
+│   │       ├── 2025_10_08_1041-initial_migration.py
+│   │       ├── 2025_10_11_0836-add_sectional_embeddings.py
+│   │       ├── 2025_10_14_0653-add_unique_index_for_jobs.py
+│   │       └── 2025_10_16_1514-add_resume_sentence_and_job_sentence.py
+│   │
+│   ├── scripts/                               # 유틸리티 스크립트 (테스트, 분석)
+│   │   ├── comprehensive_matching_test.py    # 종합 매칭 테스트 (모든 이력서-공고)
+│   │   ├── comprehensive_threshold_analysis.py # 동적 임계값 분석 및 튜닝
+│   │   ├── test_multiple_resumes.py          # 다중 이력서 테스트
+│   │   ├── test_100_jobs_performance.py      # 성능 테스트 (100개 공고)
+│   │   ├── ingest_and_match_single_job.py    # 단일 공고 등록 및 매칭 테스트
+│   │   ├── generate_100_jobs.py              # 더미 공고 생성 (100개)
+│   │   ├── simple_100_jobs.py                # 간단한 더미 공고 생성
+│   │   ├── analyze_thresholds.py             # 임계값 분석
+│   │   └── backfill_sentences.py            # 문장 임베딩 백필 (기존 데이터)
+│   │
+│   ├── tests/                                 # 테스트 코드
+│   │   ├── unit/                              # 단위 테스트
+│   │   ├── integration/                       # 통합 테스트
+│   │   └── test_document_parsing.py          # 문서 파싱 테스트
+│   │
+│   ├── uploads/                               # 업로드된 파일 저장소
+│   ├── logs/                                  # 로그 파일
+│   ├── ml_models/                             # ML 모델 저장소 (로컬 캐싱)
+│   │
+│   ├── Dockerfile                             # Docker 이미지 빌드 설정
+│   ├── requirements.txt                      # Python 의존성 패키지
+│   ├── alembic.ini                           # Alembic 설정 파일
+│   └── pyproject.toml                        # 프로젝트 메타데이터
 │
-├── embedding-service/           # 임베딩 전용 서비스
-│   ├── main.py
-│   ├── Dockerfile
-│   └── requirements.txt
-│
-├── data/                        # 데이터 디렉토리
-│   ├── jobs/                    # 채용 공고 JSON
-│   └── resumes/                 # 이력서 파일
-│
-├── scripts/                     # 전역 스크립트
-│   ├── init_pgvector.sql
-│   └── ...
-│
-├── docker-compose.yml
-├── .env
-└── README.md
+├── docker-compose.yml                         # Docker Compose 설정 (backend, postgres, redis)
+├── .env                                       # 환경 변수 (DB URL, API 키 등)
+└── README.md                                  # 프로젝트 개요 및 시작 가이드
 ```
 
 ---
@@ -161,9 +232,17 @@ Project1/
 ### ERD 개요
 
 ```
-User ──< Resume ──< MatchingResult >── JobPosting >── Company
-                         │
-                         └──< LLMFeedback
+User ──< Resume ──< ResumeSentence
+         │            │
+         │            └── (문장 단위 임베딩)
+         │
+         └──< MatchingResult (실시간 계산, DB 저장 안 함)
+                    │
+                    └──> JobPosting >── Company
+                              │
+                              └──< JobSentence
+                                   │
+                                   └── (문장 단위 임베딩)
 ```
 
 ### 주요 테이블
@@ -286,11 +365,11 @@ CREATE TABLE resume (
     -- 파일 정보
     file_name VARCHAR(500) NOT NULL,
     file_url VARCHAR(500) NOT NULL,
-    file_type VARCHAR(50),  -- pdf, docx, txt, xlsx
+    file_type VARCHAR(50),  -- pdf, docx, txt, xlsx, hwp
     file_size INTEGER,
     
     -- 텍스트
-    raw_text TEXT NOT NULL,  -- 전체 원본 텍스트
+    raw_text TEXT NOT NULL,  -- 전체 원본 텍스트 (모든 페이지/시트 포함)
     
     -- 파싱된 구조화 데이터 (JSONB)
     parsed_data JSONB,
@@ -303,7 +382,7 @@ CREATE TABLE resume (
     --   "certifications": [...],
     --   "languages": [...],
     --   "projects": [...],
-    --   "skills_narrative": "...",  -- GPT-5 추출 (문장형)
+    --   "skills_narrative": "...",  -- GPT-4 추출 (문장형)
     --   "projects_narrative": "..."
     -- }
     
@@ -317,7 +396,7 @@ CREATE TABLE resume (
     embedding VECTOR(768),  -- 전체 텍스트 임베딩
     embedding_model VARCHAR(100) DEFAULT 'jhgan/ko-sroberta-multitask',
     
-    -- 섹션별 임베딩 (최신)
+    -- 섹션별 임베딩 (참고용, 실제로는 문장 단위 사용)
     skills_embedding VECTOR(768),        -- 스킬 narrative
     experience_embedding VECTOR(768),    -- 경력 섹션
     projects_embedding VECTOR(768),      -- 프로젝트 narrative
@@ -334,6 +413,62 @@ CREATE TABLE resume (
     -- 인덱스
     INDEX idx_resume_user_id (user_id),
     INDEX idx_resume_created_at (created_at)
+);
+```
+
+#### 4-1. `resume_sentence` (이력서 문장 단위 임베딩) ⭐ NEW!
+
+```sql
+CREATE TABLE resume_sentence (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    resume_id UUID REFERENCES resume(id) ON DELETE CASCADE,
+    
+    -- 섹션 정보
+    section VARCHAR(50) NOT NULL,  -- 'skills', 'experience', 'projects', 'education'
+    idx INTEGER NOT NULL,          -- 섹션 내 문장 순서
+    
+    -- 문장 텍스트
+    text TEXT NOT NULL,
+    
+    -- 임베딩
+    embedding VECTOR(768) NOT NULL,
+    embedding_model VARCHAR(100) DEFAULT 'jhgan/ko-sroberta-multitask',
+    
+    -- 타임스탬프
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- 인덱스
+    INDEX idx_resume_sentence_resume_id (resume_id),
+    INDEX idx_resume_sentence_section (section),
+    UNIQUE(resume_id, section, idx)
+);
+```
+
+#### 4-2. `job_sentence` (채용 공고 문장 단위 임베딩) ⭐ NEW!
+
+```sql
+CREATE TABLE job_sentence (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    job_id UUID REFERENCES job_posting(id) ON DELETE CASCADE,
+    
+    -- 섹션 정보
+    section VARCHAR(50) NOT NULL,  -- 'required', 'preferred', 'description', 'responsibilities'
+    idx INTEGER NOT NULL,          -- 섹션 내 문장 순서
+    
+    -- 문장 텍스트
+    text TEXT NOT NULL,
+    
+    -- 임베딩
+    embedding VECTOR(768) NOT NULL,
+    embedding_model VARCHAR(100) DEFAULT 'jhgan/ko-sroberta-multitask',
+    
+    -- 타임스탬프
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- 인덱스
+    INDEX idx_job_sentence_job_id (job_id),
+    INDEX idx_job_sentence_section (section),
+    UNIQUE(job_id, section, idx)
 );
 ```
 
@@ -467,25 +602,49 @@ CREATE TABLE matching_config (
 └─────────────────────┘
 ```
 
-### 2. 동적 임계값 시스템 (NEW!) ⭐⭐⭐⭐⭐
+### 2. 동적 임계값 시스템 (최적화 완료) ⭐⭐⭐⭐⭐
+
+**기술 스택별 세분화된 임계값** (종합 분석 결과 기반 최적화)
 
 ```python
-# 기술 스택별 세분화된 임계값
 tech_thresholds = {
-    # 충돌 방지 - 매우 엄격
-    'java': 0.75, 'kotlin': 0.75, 'spring': 0.75,
-    'react': 0.75, 'next.js': 0.75, 'typescript': 0.75,
-    'android': 0.75, 'ios': 0.75,
+    # 백엔드 기술 스택 (종합 분석 결과 기반)
+    'java': 0.64, 'kotlin': 0.64, 'spring': 0.64,      # 0.60 → 0.64 (분석 결과: 0.638 추천)
+    'python': 0.61, 'fastapi': 0.61, 'django': 0.61,  # 0.58 → 0.61 (분석 결과: 0.614 추천)
+    'node.js': 0.62, 'express': 0.62,                 # 유지
     
-    # 일반 기술 - 적절한 매칭
-    'python': 0.62, 'fastapi': 0.62, 'django': 0.62,
-    'mysql': 0.55, 'postgresql': 0.55, 'mongodb': 0.55,
-    'aws': 0.65, 'gcp': 0.65, 'azure': 0.65,
+    # 프론트엔드 기술 스택 (종합 분석 결과 기반)
+    'react': 0.66, 'next.js': 0.66, 'typescript': 0.66,  # 0.60 → 0.66 (분석 결과: 0.661 추천)
+    'vue.js': 0.62, 'angular': 0.62,                   # 유지
+    'flutter': 0.62,                                  # 유지
+    
+    # 모바일 개발 (현재 적절)
+    'android': 0.70, 'ios': 0.70,                     # 유지
+    
+    # 데이터베이스 (종합 분석 결과 기반)
+    'mysql': 0.61, 'postgresql': 0.61, 'mongodb': 0.61,  # 0.55 → 0.61 (분석 결과: 0.612 추천)
+    
+    # 클라우드/인프라 (종합 분석 결과 기반)
+    'aws': 0.65, 'gcp': 0.65, 'azure': 0.65,         # 0.62 → 0.65 (분석 결과: 0.651 추천)
+    'docker': 0.58, 'kubernetes': 0.65,               # 유지
+    
+    # AI/ML (유지)
+    'tensorflow': 0.62, 'pytorch': 0.62, 'opencv': 0.62,
+    'langchain': 0.62, 'langgraph': 0.62,
+    
+    # API (별도 처리)
+    'api': 0.63, 'rest': 0.63, 'restful': 0.63,
     
     # 기본값
     'default': 0.60
 }
 ```
+
+**동적 임계값 적용 로직:**
+- 조건(condition) 텍스트에서 기술 키워드 추출
+- 여러 기술이 포함된 경우 가장 높은 임계값 사용
+- 기술 키워드가 없으면 기본값(0.60) 사용
+- 실시간 로깅으로 적용된 임계값 추적
 
 ### 3. 현재 가중치 (최적화 완료) ⭐ 문장 단위 매칭!
 
@@ -500,11 +659,14 @@ SECTIONAL_WEIGHTS = {
 }
 ```
 
-**매칭 방식:**
-- ✅ 문장 단위 세밀한 매칭 (섹션별 문장 추출)
-- ✅ 동적 임계값 적용 (기술 스택별 최적화)
+**매칭 방식 (v3.0-sectional-sentences):**
+- ✅ 문장 단위 세밀한 매칭 (섹션별 문장 추출 및 임베딩)
+- ✅ 동적 임계값 적용 (기술 스택별 최적화, 종합 분석 기반)
 - ✅ 충돌 기술 스택 자동 차단 (Java vs Python, React vs Flutter)
-- ✅ 실시간 로깅 및 Near Miss 감지
+- ✅ 실시간 로깅 및 Near Miss 감지 (임계값 근처 케이스 추적)
+- ✅ Dampening 로직 (required_score < 0.5 시 50% 감점)
+- ✅ 페널티 시스템 (경력 불일치, 필수 스킬 부족)
+- ✅ 청크 처리 지원 (LLM 파싱 시 긴 텍스트 분할)
 
 ### 3. 등급 기준
 
@@ -674,11 +836,18 @@ Response:
     },
     "strengths": ["필수 조건 3개 충족", "경력 레벨 적합"],
     "improvement_areas": ["우대 스킬 부족: AWS, Kubernetes"],
-    "technical_details": {
-        "algorithm_version": "v2.0-sectional",
-        "calculation_time_ms": 1200,
-        "penalties_applied": {"experience_level_mismatch": 0.1}
-    }
+        "technical_details": {
+            "algorithm_version": "v3.0-sectional-sentences",
+            "calculation_time_ms": 1200,
+            "penalties_applied": {"experience_level_mismatch": 0.1},
+            "debug": {
+                "raw_weighted_sum": 0.651,
+                "dampened_sum": 0.651,
+                "penalty_sum": 0.188,
+                "final_score_before_clipping": 0.463,
+                "final_score_after_clipping": 0.463
+            }
+        }
 }
 ```
 
@@ -862,16 +1031,19 @@ CREATE INDEX idx_matching_scores ON matching_result(job_id, overall_score DESC);
 
 ## 📝 다음 단계
 
-### ✅ 완료 (2025-01-27)
-1. 중복 방지 UNIQUE INDEX 추가
-2. 만료 자동 비활성화 트리거 추가
-3. 매칭 결과 실시간 계산 방식으로 변경
-4. 섹션별 임베딩 매칭 구현
-5. 의미 매칭 강화 (키워드 + 동의어)
-6. 경력 페널티 캡 적용 (최대 15점)
-7. 2단계 API 구현 (빠른 검색 + on-demand 피드백)
-8. 가중치 최적화 완료
-9. 검증 완료 (100% 정확도)
+### ✅ 완료 (2025-11-14)
+1. **문장 단위 임베딩 시스템** (resume_sentence, job_sentence 테이블)
+2. **동적 임계값 최적화** (종합 분석 기반, 기술 스택별 세분화)
+3. **문서 파싱 개선** (PDF/DOCX/XLSX/HWP 모든 페이지/시트 처리)
+4. **청크 처리 지원** (LLM 파싱 시 긴 텍스트 분할)
+5. **매칭 알고리즘 v3.0** (문장 단위 매칭, Dampening, 페널티 최적화)
+6. **실시간 로깅 강화** (매칭 과정 완전 추적, Near Miss 감지)
+7. **디버그 정보 추가** (raw_score, dampened_score, penalty_sum)
+8. **성능 최적화** (~0.27초/공고, 벡터 검색 최적화)
+9. **종합 테스트 스크립트** (모든 이력서-공고 쌍 분석)
+10. **중복 방지 UNIQUE INDEX** (공고 중복 방지)
+11. **만료 자동 비활성화 트리거** (expires_at 기반)
+12. **매칭 결과 실시간 계산** (DB 저장 없이 실시간 계산)
 
 ### 단기 (1-2주)
 1. **사람인 API 연동 + GPT-5 구조화** ← 다음!
@@ -898,36 +1070,50 @@ CREATE INDEX idx_matching_scores ON matching_result(job_id, overall_score DESC);
 
 ---
 
-**Last Updated**: 2025-01-27  
-**Document Version**: 2.0
+**Last Updated**: 2025-11-14  
+**Document Version**: 3.1
 
 ---
 
-## 📈 최근 업데이트 (2025-01-27)
+## 📈 최근 업데이트 (2025-11-14)
 
-### 섹션별 임베딩 매칭 완성
-- ✅ 자격요건 vs 이력서 스킬 (의미 기반)
-- ✅ 우대조건 vs 이력서 스킬 (의미 기반)
-- ✅ 업무설명 vs 경력/프로젝트 (의미 기반)
-- ✅ 키워드 매칭으로 정확도 보완
+### 문장 단위 임베딩 시스템 완성 ⭐
+- ✅ `resume_sentence` 테이블 추가 (이력서 문장 단위 임베딩)
+- ✅ `job_sentence` 테이블 추가 (채용 공고 문장 단위 임베딩)
+- ✅ 섹션별 문장 추출 및 임베딩 생성 (skills, experience, projects, required, preferred)
+- ✅ 문장 단위 유사도 계산으로 정확도 향상
 
-### 의미 매칭 강화
-- ✅ 동의어 매핑 테이블 확장 (30+ 항목)
-- ✅ False Positive 0%, False Negative 0%
-- ✅ 정확도 100% 달성
+### 동적 임계값 최적화 완료 ⭐
+- ✅ 종합 분석 기반 임계값 튜닝 (모든 이력서-공고 쌍 분석)
+- ✅ Java/Spring: 0.60 → 0.64 (분석 결과: 0.638 추천)
+- ✅ React/Next.js: 0.60 → 0.66 (분석 결과: 0.661 추천)
+- ✅ Python/FastAPI: 0.58 → 0.61 (분석 결과: 0.614 추천)
+- ✅ MySQL/PostgreSQL: 0.55 → 0.61 (분석 결과: 0.612 추천)
+- ✅ AWS/GCP/Azure: 0.62 → 0.65 (분석 결과: 0.651 추천)
+- ✅ Near Miss 감지 시스템 (임계값 근처 케이스 자동 추적)
 
-### 경력 페널티 캡 적용
-- ✅ 최대 15점 감점 제한
-- ✅ 스킬 매칭 우수 시 경력 부족 완화
-- ✅ 현실적 점수 분포 달성
+### 문서 파싱 개선 ⭐
+- ✅ PDF 모든 페이지 파싱 (PyMuPDF)
+- ✅ DOCX LibreOffice 변환 지원 (더 정확한 파싱)
+- ✅ XLSX 모든 시트 파싱 (openpyxl)
+- ✅ HWP 파일 파싱 지원 (olefile)
+- ✅ 청크 처리 지원 (LLM 파싱 시 긴 텍스트 분할)
 
-### 2단계 API 구현
-- ✅ 빠른 검색 API (1-2초)
-- ✅ 상세 매칭 API (실시간 계산)
-- ✅ GPT-5 피드백 API (on-demand, 45초)
+### 매칭 알고리즘 v3.0 ⭐
+- ✅ 문장 단위 매칭 (섹션별 세밀한 분석)
+- ✅ Dampening 로직 (required_score < 0.5 시 50% 감점)
+- ✅ 페널티 시스템 최적화 (경력 불일치, 필수 스킬 부족)
+- ✅ 실시간 로깅 강화 (매칭 과정 완전 추적)
+- ✅ 디버그 정보 추가 (raw_score, dampened_score, penalty_sum)
 
-### 가중치 최적화 완료
-- ✅ 자격요건 40%, 경력 30%, 전체유사도 20%
-- ✅ 우대조건 8%, 학력 1.5%, 자격증 0.5%
-- ✅ 현실적 등급 기준 적용 (Fair 55%)
+### 성능 최적화
+- ✅ 매칭 처리 시간: ~0.27초/공고 (121개 공고 기준 33초)
+- ✅ 벡터 검색 최적화 (pgvector HNSW 인덱스)
+- ✅ 문장 단위 임베딩 캐싱
+
+### 테스트 및 검증
+- ✅ 종합 매칭 테스트 스크립트 (모든 이력서-공고 쌍)
+- ✅ 동적 임계값 분석 스크립트 (통계 기반 튜닝)
+- ✅ 성능 테스트 스크립트 (100개 공고)
+- ✅ 문서 파싱 테스트 (PDF, DOCX, XLSX, HWP)
 
