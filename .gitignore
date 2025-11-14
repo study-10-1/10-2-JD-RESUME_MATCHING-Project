@@ -55,6 +55,17 @@ faiss_index/
 uploads/
 temp/
 data/
+SYSTEM_FLOW_ANALYSIS.md
+test_resume.hwp
+backend/comprehensive_test_results_*.json
+backend/scripts/analyze_thresholds.py
+backend/scripts/comprehensive_matching_test.py
+backend/scripts/comprehensive_threshold_analysis.py
+backend/scripts/generate_100_jobs.py
+backend/scripts/ingest_and_match_single_job.py
+backend/scripts/simple_100_jobs.py
+backend/scripts/test_100_jobs_performance.py
+backend/tests/
 
 # Logs
 *.log
