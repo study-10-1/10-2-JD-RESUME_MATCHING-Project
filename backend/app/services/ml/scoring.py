@@ -639,28 +639,64 @@ class ScoringService:
         cached = self._resume_sentence_cache.get(key)
         if cached:
             return cached['lines'], cached['embs'], cached['sections']
-        # Prefer DB-stored sentences if available
-        db_lines, db_secs = self._load_resume_sentences(resume)
+        
+        # DB에서 문장 텍스트, 임베딩, 섹션 로드
+        db_lines, db_embs, db_secs = self._load_resume_sentences(resume)
+        
         if db_lines:
             lines, sections = db_lines, db_secs
+            # DB 임베딩이 있는 것과 없는 것을 구분
+            embs = []
+            for i, emb in enumerate(db_embs):
+                if emb is not None:
+                    embs.append(emb)  # DB 임베딩 사용
+                else:
+                    # DB 임베딩이 없으면 새로 생성
+                    new_emb = self._embed_texts([lines[i]])[0] if lines[i] else None
+                    embs.append(new_emb)
         else:
+            # DB에 문장이 없으면 파싱해서 생성
             lines, sections = self._collect_resume_sentences_with_sections(resume)
-        embs = self._embed_texts(lines)
+            embs = self._embed_texts(lines)
+        
         self._resume_sentence_cache[key] = { 'lines': lines, 'embs': embs, 'sections': sections }
         return lines, embs, sections
 
-    def _load_resume_sentences(self, resume: Resume) -> (List[str], List[str]):
+    def _load_resume_sentences(self, resume: Resume) -> (List[str], List[list], List[str]):
+        """이력서 문장 텍스트, 임베딩, 섹션을 DB에서 로드"""
         try:
             from app.models.sentences import ResumeSentence
+            import numpy as np
             if not self.db:
-                return [], []
+                return [], [], []
             rows = self.db.query(ResumeSentence).filter(ResumeSentence.resume_id == resume.id).order_by(ResumeSentence.idx.asc()).all()
             if not rows:
-                return [], []
-            return [r.text for r in rows], [r.section or 'raw' for r in rows]
+                return [], [], []
+            
+            texts = []
+            embeddings = []
+            sections = []
+            
+            for r in rows:
+                texts.append(r.text)
+                sections.append(r.section or 'raw')
+                # DB에 임베딩이 있으면 사용, 없으면 None
+                if r.embedding is not None:
+                    # pgvector Vector 타입을 리스트로 변환 (numpy array로 먼저 변환 후 리스트로)
+                    try:
+                        import numpy as np
+                        emb_array = np.array(r.embedding, dtype='float32')
+                        embeddings.append(emb_array.tolist())
+                    except Exception as e:
+                        logger.warning(f"Failed to convert embedding to list: {e}")
+                        embeddings.append(None)
+                else:
+                    embeddings.append(None)
+            
+            return texts, embeddings, sections
         except Exception as e:
             logger.warning(f"Failed to load resume sentences: {e}")
-            return [], []
+            return [], [], []
 
     def _embed_texts(self, texts: List[str]) -> List[list]:
         try:
@@ -676,33 +712,47 @@ class ScoringService:
         except Exception:
             return [None for _ in texts]
 
-    def _best_sentence_match(self, condition: str, sent_lines: List[str], sent_embeddings: List[list]) -> (float, str):
+    def _best_sentence_match(self, condition: str, sent_lines: List[str], sent_embeddings: List[list], condition_embedding: List[float] = None) -> (float, str):
+        """조건과 이력서 문장들 중 가장 유사한 문장 찾기
+        
+        Args:
+            condition: 공고 조건 텍스트
+            sent_lines: 이력서 문장 텍스트 리스트
+            sent_embeddings: 이력서 문장 임베딩 리스트
+            condition_embedding: 조건 임베딩 (있으면 사용, 없으면 새로 생성)
+        """
         try:
-            from app.services.ml.embedding import EmbeddingService
-            emb = EmbeddingService()
-            cond_emb = emb.generate_embedding(condition)
-        except Exception:
-            return 0.0, ""
-        import numpy as np
-        best_sim = -1.0
-        best_sent = ""
-        for s, se in zip(sent_lines, sent_embeddings):
-            if se is None:
-                continue
-            a = np.array(se, dtype='float32')
-            b = np.array(cond_emb, dtype='float32')
-            na = np.linalg.norm(a)
-            nb = np.linalg.norm(b)
-            if na == 0 or nb == 0:
-                sim = 0.0
+            import numpy as np
+            
+            # 조건 임베딩: 파라미터로 받았으면 사용, 없으면 새로 생성
+            if condition_embedding is not None:
+                cond_emb = np.array(condition_embedding, dtype='float32')
             else:
-                sim = float((a @ b) / (na * nb))
-            if sim > best_sim:
-                best_sim = sim
-                best_sent = s
-        if best_sim < 0:
-            best_sim = 0.0
-        return best_sim, best_sent
+                from app.services.ml.embedding import EmbeddingService
+                emb = EmbeddingService()
+                cond_emb = np.array(emb.generate_embedding(condition), dtype='float32')
+            
+            best_sim = -1.0
+            best_sent = ""
+            for s, se in zip(sent_lines, sent_embeddings):
+                if se is None:
+                    continue
+                a = np.array(se, dtype='float32')
+                na = np.linalg.norm(a)
+                nb = np.linalg.norm(cond_emb)
+                if na == 0 or nb == 0:
+                    sim = 0.0
+                else:
+                    sim = float((a @ cond_emb) / (na * nb))
+                if sim > best_sim:
+                    best_sim = sim
+                    best_sent = s
+            if best_sim < 0:
+                best_sim = 0.0
+            return best_sim, best_sent
+        except Exception as e:
+            logger.warning(f"Error in _best_sentence_match: {e}")
+            return 0.0, ""
 
     def _condition_soft_score(self, condition: str, sent_lines: List[str], sent_embeddings: List[list], section: str, resume_skills_lower: Set[str]) -> float:
         thr = 0.70 if section == "required" else 0.60

@@ -16,6 +16,7 @@ import json
 from app.models.job import JobPosting
 from app.models.resume import Resume
 from app.models.matching import MatchingResult
+from app.models.sentences import ResumeSentence, JobSentence
 from app.services.ml.vector_search import VectorSearchService
 from app.services.ml.scoring import ScoringService
 from app.core.config import settings
@@ -324,18 +325,55 @@ class MatchingService:
         return matching_result
 
     def _calculate_overall_similarity(self, job: JobPosting, resume: Resume) -> float:
-        """전체 텍스트 유사도 계산"""
+        """전체 텍스트 유사도 계산 (최적화: DB 임베딩 우선 사용)"""
         try:
-            # 전체 텍스트 임베딩 생성
-            job_text = f"{job.title} {job.description or ''} {job.requirements or ''} {job.qualifications or ''}"
+            job_embedding = None
+            resume_embedding = None
             
-            # 이력서 텍스트 구성 (parsed_data에서 추출)
-            parsed_data = resume.parsed_data or {}
-            resume_text = f"{parsed_data.get('summary', '')} {parsed_data.get('work_experience', '')} {parsed_data.get('skills', '')} {parsed_data.get('projects', '')}"
+            # 1. 우선순위 1: DB에 저장된 전체 임베딩 사용 (가장 빠름)
+            if job.embedding is not None:
+                job_embedding = job.embedding
+                logger.debug("Using job.embedding from DB")
+            if resume.embedding is not None:
+                resume_embedding = resume.embedding
+                logger.debug("Using resume.embedding from DB")
             
-            # 임베딩 생성
-            job_embedding = self.embedding_service.generate_embedding(job_text)
-            resume_embedding = self.embedding_service.generate_embedding(resume_text)
+            # 2. 우선순위 2: 문장 임베딩 평균 풀링 (빠름)
+            if job_embedding is None:
+                job_sentences = self.db.query(JobSentence).filter(
+                    JobSentence.job_id == job.id
+                ).all()
+                if job_sentences:
+                    # 모든 문장 임베딩을 평균
+                    embeddings = [np.array(s.embedding) for s in job_sentences if s.embedding is not None]
+                    if embeddings:
+                        job_embedding = np.mean(embeddings, axis=0).tolist()
+                        logger.debug(f"Using average of {len(embeddings)} job sentence embeddings")
+            
+            if resume_embedding is None:
+                resume_sentences = self.db.query(ResumeSentence).filter(
+                    ResumeSentence.resume_id == resume.id
+                ).all()
+                if resume_sentences:
+                    # 모든 문장 임베딩을 평균
+                    embeddings = [np.array(s.embedding) for s in resume_sentences if s.embedding is not None]
+                    if embeddings:
+                        resume_embedding = np.mean(embeddings, axis=0).tolist()
+                        logger.debug(f"Using average of {len(embeddings)} resume sentence embeddings")
+            
+            # 3. 우선순위 3: 폴백 - 새로 생성 (느림, 최후의 수단)
+            if job_embedding is None:
+                job_text = f"{job.title} {job.description or ''} {job.requirements or ''} {job.qualifications or ''}"
+                job_embedding = self.embedding_service.generate_embedding(job_text)
+                logger.warning("Generated new job embedding (fallback)")
+            
+            if resume_embedding is None:
+                parsed_data = resume.parsed_data or {}
+                resume_text = f"{parsed_data.get('summary', '')} {parsed_data.get('work_experience', '')} {parsed_data.get('skills', '')} {parsed_data.get('projects', '')}"
+                if not resume_text.strip():
+                    resume_text = resume.raw_text or ""
+                resume_embedding = self.embedding_service.generate_embedding(resume_text)
+                logger.warning("Generated new resume embedding (fallback)")
             
             # 코사인 유사도 계산
             similarity = self.embedding_service.cosine_similarity(job_embedding, resume_embedding)
@@ -394,8 +432,8 @@ class MatchingService:
     def _calculate_section_score_by_sentences(self, job: JobPosting, resume: Resume, section: str) -> dict:
         """섹션별 문장 단위 매칭 점수 계산"""
         try:
-            # 공고의 해당 섹션 문장들 가져오기
-            job_sentences = self._get_job_sentences_by_section(job, section)
+            # 공고의 해당 섹션 문장 텍스트와 임베딩 가져오기
+            job_sentences, job_embeddings = self._get_job_sentences_by_section(job, section)
             if not job_sentences:
                 return {"score": 0.0, "evidence": {"matched": [], "missing": [], "detailed_analysis": []}}
             
@@ -407,8 +445,15 @@ class MatchingService:
             matched_conditions = []
             missing_conditions = []
             
-            for condition in job_sentences:
-                best_sim, best_sentence = self.scoring._best_sentence_match(condition, resume_sentences, resume_embeddings)
+            for idx, condition in enumerate(job_sentences):
+                # DB 임베딩이 있으면 사용, 없으면 None 전달 (함수 내에서 생성)
+                condition_emb = job_embeddings[idx] if idx < len(job_embeddings) else None
+                best_sim, best_sentence = self.scoring._best_sentence_match(
+                    condition, 
+                    resume_sentences, 
+                    resume_embeddings,
+                    condition_embedding=condition_emb
+                )
                 
                 # 임계값 설정 (조건별 세분화)
                 threshold = self._get_dynamic_threshold(condition, section)
@@ -470,23 +515,45 @@ class MatchingService:
             logger.error(f"Section score calculation failed for {section}: {e}")
             return {"score": 0.0, "evidence": {"matched": [], "missing": [], "detailed_analysis": []}}
     
-    def _get_job_sentences_by_section(self, job: JobPosting, section: str) -> list:
-        """공고의 특정 섹션 문장들 가져오기"""
+    def _get_job_sentences_by_section(self, job: JobPosting, section: str) -> tuple:
+        """공고의 특정 섹션 문장 텍스트와 임베딩 가져오기
+        
+        Returns:
+            (texts: List[str], embeddings: List[List[float]])
+        """
         try:
             from app.models.sentences import JobSentence
             db = job._sa_instance_state.session
             if not db:
-                return []
+                return [], []
             
             rows = db.query(JobSentence).filter(
                 JobSentence.job_id == job.id,
                 JobSentence.section == section
             ).order_by(JobSentence.idx.asc()).all()
             
-            return [row.text for row in rows]
+            texts = []
+            embeddings = []
+            
+            for row in rows:
+                texts.append(row.text)
+                # DB에 임베딩이 있으면 사용, 없으면 None
+                if row.embedding is not None:
+                    # pgvector Vector 타입을 리스트로 변환 (numpy array로 먼저 변환 후 리스트로)
+                    try:
+                        import numpy as np
+                        emb_array = np.array(row.embedding, dtype='float32')
+                        embeddings.append(emb_array.tolist())
+                    except Exception as e:
+                        logger.warning(f"Failed to convert embedding to list: {e}")
+                        embeddings.append(None)
+                else:
+                    embeddings.append(None)
+            
+            return texts, embeddings
         except Exception as e:
             logger.warning(f"Failed to get job sentences for section {section}: {e}")
-            return []
+            return [], []
     
     def _calculate_matching_score_sectional(
         self,
