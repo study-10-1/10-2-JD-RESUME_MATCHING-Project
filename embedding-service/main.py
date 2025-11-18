@@ -22,7 +22,9 @@ app = FastAPI(
 
 # 전역 모델 (싱글톤)
 model = None
-MODEL_NAME = "jhgan/ko-sroberta-multitask"
+# 환경 변수에서 모델명 가져오기 (기본값: 현재 모델)
+import os
+MODEL_NAME = os.getenv("MODEL_NAME", "jhgan/ko-sroberta-multitask")
 
 
 def get_model():

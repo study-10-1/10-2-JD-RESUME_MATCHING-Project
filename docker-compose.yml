@@ -43,7 +43,7 @@ services:
     ports:
       - "8001:8001"
     environment:
-      - MODEL_NAME=jhgan/ko-sroberta-multitask
+      - MODEL_NAME=${EMBEDDING_MODEL:-jhgan/ko-sroberta-multitask}
     volumes:
       - ml_models:/root/.cache/torch
     restart: unless-stopped
