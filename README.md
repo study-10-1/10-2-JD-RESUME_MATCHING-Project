@@ -278,15 +278,34 @@ CRAWLER_RETRY_DELAY=5
 ### 처리 속도
 - 단일 공고 매칭: 약 0.1-0.5초 (임베딩 사전 생성 시)
 - 전체 공고 매칭 (250개 기준): 약 1초 이내
-- 벡터 검색: 약 0.01초 (pgvector HNSW)
+- 벡터 유사도 계산: pgvector HNSW 인덱스 활용
 - API 응답 시간: 0.5초 (250개 공고 기준)
 
 ### 최적화
 - 섹션 임베딩 사전 생성 및 저장
 - 문장 단위 임베딩 사전 생성 및 저장
-- pgvector HNSW 인덱스 활용
+- pgvector HNSW 인덱스를 활용한 벡터 유사도 검색
 - 로깅 레벨 최적화
 - 효율적인 문장 단위 매칭 알고리즘
+
+### HNSW 인덱스 설정
+
+벡터 검색 성능 향상을 위한 HNSW 인덱스는 선택사항입니다. 현재 규모(250개 공고)에서는 충분히 빠르지만, 확장성을 고려하면 추가할 수 있습니다.
+
+```bash
+# HNSW 인덱스 생성
+docker compose exec postgres psql -U postgres -d auto_match -f backend/scripts/add_hnsw_indexes.sql
+```
+
+또는 직접 SQL 실행:
+
+```bash
+docker compose exec postgres psql -U postgres -d auto_match
+```
+
+인덱스 생성 시간: 약 5초 (현재 데이터 기준)
+
+**참고**: HNSW 인덱스는 메모리를 추가로 사용합니다 (약 45MB). 현재 성능이 충분하다면 선택사항입니다.
 
 ## 개발 가이드
 
