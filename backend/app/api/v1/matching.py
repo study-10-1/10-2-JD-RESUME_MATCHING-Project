@@ -105,6 +105,7 @@ async def search_jobs_for_resume(
         matching_service = MatchingService(db)
         
         # 채용공고 검색 및 매칭 (검색 단계: 피드백 비활성)
+        # limit 파라미터로 상위 n개만 반환 (정렬된 순서 유지)
         results = matching_service.search_jobs_for_resume(
             resume_id=request.resume_id,
             filters=request.filters.dict() if request.filters else None,
@@ -116,7 +117,8 @@ async def search_jobs_for_resume(
         return {
             "resume_id": str(request.resume_id),
             "matches": results,
-            "total_count": len(results),
+            "total_count": len(results),  # 반환된 개수 (limit 적용 후)
+            "limit": request.limit,
             "processing_time_ms": processing_time
         }
         

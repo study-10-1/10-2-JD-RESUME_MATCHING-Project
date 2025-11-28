@@ -1,115 +1,88 @@
 # Auto-Match: AI-based Resume & Job Matching System
 
-**한국어 특화 AI 기반 이력서-채용공고 자동 매칭 시스템**
+한국어 특화 AI 기반 이력서-채용공고 자동 매칭 시스템
 
-> 🎯 **현재 상태**: 핵심 매칭 알고리즘 구현 완료 | 동적 임계값 시스템 적용 중 | 개발 단계
+## 개요
 
----
+Auto-Match는 의미 기반 임베딩과 동적 임계값 시스템을 활용하여 이력서와 채용공고를 정확하게 매칭하는 시스템입니다. 문장 단위 세밀한 분석을 통해 기술 스택, 경력, 자격요건 등을 종합적으로 평가합니다.
 
-## 📋 목차
+## 주요 기능
 
-- [핵심 기능](#-핵심-기능)
-- [기술 스택](#-기술-스택)
-- [빠른 시작](#-빠른-시작)
-- [프로젝트 구조](#-프로젝트-구조)
-- [API 엔드포인트](#-api-엔드포인트)
-- [매칭 알고리즘 상세](#-매칭-알고리즘-상세)
-- [파일 파싱 기능](#-파일-파싱-기능)
-- [성능 및 검증](#-성능-및-검증)
-- [개발 가이드](#-개발-가이드)
-- [최근 개선사항](#-최근-개선사항)
-
----
-
-## ✨ 핵심 기능
-
-### 1. **의미 기반 매칭** 
+### 의미 기반 매칭
 - Bi-encoder 임베딩 기반 코사인 유사도 계산
-- 한국어 특화 모델 (`jhgan/ko-sroberta-multitask`)
-- 768차원 벡터 공간에서 의미적 유사도 분석
+- 한국어 특화 모델 (jhgan/ko-sroberta-multitask, 768차원)
 - 문장 단위 세밀한 매칭으로 정확도 향상
+- 섹션별 임베딩 매칭 (자격요건, 우대조건, 업무설명)
 
-### 2. **동적 임계값 시스템** ⭐
+### 동적 임계값 시스템
 - 기술 스택별 세분화된 임계값 적용
-- 충돌 기술 스택 자동 감지 및 차단 (Java vs Python, React vs Flutter)
+- 충돌 기술 스택 자동 감지 및 차단
 - 실시간 로깅 및 Near Miss 감지
-- 테스트 데이터 기준으로 높은 정확도 관측
+- 테스트 데이터 기반 최적화
 
-### 3. **섹션별 임베딩 매칭** 
-- 자격요건 vs 이력서 스킬 (의미 기반)
-- 우대조건 vs 이력서 스킬 (의미 기반)
-- 업무설명 vs 경력/프로젝트 (의미 기반)
-- 문장 단위 세밀한 매칭
-
-### 4. **다차원 점수 계산**
-- 4개 주요 카테고리 종합 평가 (자격요건/우대조건/경력/전체유사도)
-- 최적화된 가중치 적용 (실제 테스트 기반 튜닝)
+### 다차원 점수 계산
+- 자격요건 매칭 (60% 가중치)
+- 우대조건 매칭 (20% 가중치)
+- 경력 매칭 (10% 가중치)
+- 기술 스택 유사도 (10% 가중치)
 - 경력 페널티 캡 적용 (최대 15점 감점)
 - 감쇠(Dampening) 로직으로 엄격성 강화
 
-### 5. **상세 매칭 분석**
+### 상세 매칭 분석
 - 자격요건/우대조건 개별 매칭 현황
-- 누락 스킬 및 충족 스킬 명시
+- 기술 스택 추출 및 매칭 상태 표시
 - 매칭 근거 및 개선 제안 제공
-- 디버그 정보 포함 (raw_score, dampened_score, penalty 등)
+- 디버그 정보 포함
 
-### 6. **GPT-4 피드백** (선택)
-- 맞춤형 강점/개선점/추천사항 생성
-- LLM 기반 이력서 고도화 파싱
-- 폴백 메커니즘으로 안정성 확보
+### 채용공고 크롤링
+- 웹 크롤링을 통한 채용공고 자동 수집
+- 스케줄러 기반 자동화 (매일 9시 실행)
+- 만료된 공고 자동 삭제
+- 중복 방지 메커니즘
 
----
+### 파일 파싱
+- PDF, DOCX, XLSX, HWP 형식 지원
+- 모든 페이지/시트 자동 추출
+- LLM 기반 구조화 파싱
+- 기술 스택 자동 추출
 
-## 🔧 기술 스택
+## 기술 스택
 
 ### Backend
-- **Framework**: FastAPI 0.104+
-- **Language**: Python 3.10+
-- **Database**: PostgreSQL 15 + pgvector (벡터 검색)
-- **Cache**: Redis 7+ (Optional)
-- **Container**: Docker + Docker Compose
+- FastAPI 0.104+
+- Python 3.10+
+- PostgreSQL 15 + pgvector
+- Redis 7+ (선택사항)
+- Docker + Docker Compose
 
 ### AI/ML
-- **Embedding**: `jhgan/ko-sroberta-multitask` (768-dim, 한국어 Bi-encoder)
-- **Vector Search**: pgvector (Cosine Similarity, HNSW 인덱스)
-- **LLM**: OpenAI GPT-4 (피드백 생성 및 구조화 파싱)
-- **Parsing**: 
-  - PDF: PyMuPDF (모든 페이지 지원)
-  - DOCX: python-docx + LibreOffice 변환 (정확한 페이지 구조 추출)
-  - XLSX: openpyxl (모든 시트 지원)
-  - HWP: olefile (텍스트 추출)
+- Embedding: jhgan/ko-sroberta-multitask (768-dim)
+- Vector Search: pgvector (Cosine Similarity, HNSW 인덱스)
+- LLM: OpenAI GPT-4 (피드백 생성 및 구조화 파싱)
 
-### 성능
-- **정확도**: 테스트 데이터 기준으로 높은 정확도 관측 (도메인 및 데이터에 따라 상이)
-- **오탐지율**: 동적 임계값 시스템으로 낮은 오탐지율 유지
-- **처리 속도**: 
-  - 점수 계산: ~1초/건 (임베딩 사전 생성 시)
-  - 벡터 검색: ~0.1초 (pgvector HNSW)
-  - 100개 공고 매칭: ~24초 (평균 0.24초/건)
-- **확장성**: 10,000개 공고 검색 ~10초 (pgvector HNSW)
-- **API 응답**: 
-  - 검색 결과: 1-2초
-  - 상세 피드백: 45초 (on-demand, GPT-4 기준)
+### 파일 파싱
+- PDF: PyMuPDF
+- DOCX: python-docx + LibreOffice 변환
+- XLSX: openpyxl
+- HWP: olefile
 
----
+## 빠른 시작
 
-## 🚀 빠른 시작
-
-### 1. 환경 설정
+### 환경 설정
 
 ```bash
 # 프로젝트 클론
 git clone <repository-url>
 cd Project1
 
-# 환경 변수 확인 (.env 파일이 이미 생성되어 있습니다)
+# 환경 변수 확인
 cat .env
 ```
 
-### 2. Docker 컨테이너 시작
+### Docker 컨테이너 시작
 
 ```bash
-# 모든 서비스 시작 (PostgreSQL, Redis, Backend, Embedding Server)
+# 모든 서비스 시작
 docker-compose up -d
 
 # 로그 확인
@@ -119,119 +92,76 @@ docker-compose logs -f backend
 docker-compose ps
 ```
 
-### 3. 데이터베이스 마이그레이션
+### 데이터베이스 마이그레이션
 
 ```bash
-# Backend 컨테이너에 접속
+# Backend 컨테이너 접속
 docker-compose exec backend bash
-
-# 마이그레이션 생성 (최초 1회)
-alembic revision --autogenerate -m "Initial migration"
 
 # 마이그레이션 적용
 alembic upgrade head
-
-# 컨테이너에서 나가기
-exit
 ```
 
-### 4. API 접속
+### API 접속
 
-- **Backend API**: http://localhost:8000
-- **API 문서 (Swagger)**: http://localhost:8000/docs
-- **API 문서 (ReDoc)**: http://localhost:8000/redoc
-- **Health Check**: http://localhost:8000/health
+- Backend API: http://localhost:8000
+- API 문서 (Swagger): http://localhost:8000/docs
+- API 문서 (ReDoc): http://localhost:8000/redoc
+- Health Check: http://localhost:8000/health
 
-### 5. 테스트
-
-```bash
-# 이력서 업로드 테스트
-curl -X POST "http://localhost:8000/api/v1/resumes/upload-and-process" \
-  -H "Content-Type: multipart/form-data" \
-  -F "file=@/path/to/resume.pdf"
-
-# 매칭 검색 테스트
-curl -X POST "http://localhost:8000/api/v1/matching/search-jobs" \
-  -H "Content-Type: application/json" \
-  -d '{"resume_id": "your-resume-id"}'
-```
-
----
-
-## 📁 프로젝트 구조
+## 프로젝트 구조
 
 ```
 Project1/
-├── backend/                 # 🎯 Backend 애플리케이션
-│   ├── app/                # FastAPI 앱
-│   │   ├── api/           # API 엔드포인트
-│   │   │   └── v1/
-│   │   │       ├── resumes.py      # 이력서 업로드/조회
-│   │   │       ├── jobs.py         # 채용공고 조회
-│   │   │       └── matching.py    # 매칭 검색/상세
-│   │   ├── core/          # 핵심 유틸리티
-│   │   │   ├── config.py          # 설정 관리
-│   │   │   ├── database.py       # DB 연결
-│   │   │   └── logging.py        # 로깅 설정
-│   │   ├── models/        # SQLAlchemy 모델
-│   │   │   ├── resume.py          # 이력서 모델
-│   │   │   ├── job.py             # 채용공고 모델
-│   │   │   ├── matching.py       # 매칭 결과 모델
-│   │   │   └── sentences.py      # 문장 임베딩 모델
-│   │   ├── schemas/       # Pydantic 스키마
-│   │   │   ├── resume.py
-│   │   │   ├── job.py
-│   │   │   └── matching.py
-│   │   ├── services/      # 비즈니스 로직
-│   │   │   ├── matching_service.py    # ⭐ 매칭 통합 서비스
-│   │   │   ├── ml/                   # 🤖 ML 서비스
-│   │   │   │   ├── embedding.py         # 임베딩 생성
-│   │   │   │   ├── vector_search.py     # 벡터 검색
-│   │   │   │   ├── scoring.py           # 점수 계산
-│   │   │   │   ├── sectional_scoring.py # 섹션별 점수
-│   │   │   │   ├── penalties.py         # 페널티 계산
-│   │   │   │   └── feedback_generator.py # 피드백 생성
-│   │   │   ├── parsing/              # 파일 파싱
-│   │   │   │   ├── pdf_parser.py         # PDF 파서
-│   │   │   │   ├── docx_parser.py        # DOCX 파서 (PDF 변환 지원)
-│   │   │   │   ├── xlsx_parser.py        # XLSX 파서
-│   │   │   │   ├── hwp_parser.py         # HWP 파서
-│   │   │   │   └── llm_parser.py        # LLM 구조화 파서
-│   │   │   └── repositories/         # 데이터 액세스
-│   │   └── utils/         # 유틸리티
-│   ├── alembic/           # DB 마이그레이션
-│   ├── scripts/           # 유틸리티 스크립트 (테스트용)
-│   │   ├── ingest_and_match_single_job.py  # 단일 공고 인입/매칭
-│   │   ├── comprehensive_threshold_analysis.py  # 임계값 분석
-│   │   └── test_100_jobs_performance.py     # 성능 테스트
-│   ├── tests/             # 테스트
-│   ├── Dockerfile
-│   └── requirements.txt
-│
-├── docker-compose.yml      # 🐳 Docker Compose 설정
-├── .env                    # 🔐 환경 변수
-├── .gitignore              # Git 제외 파일
-└── README.md               # 이 파일
+├── backend/
+│   ├── app/
+│   │   ├── api/v1/          # API 엔드포인트
+│   │   │   ├── resumes.py   # 이력서 업로드/조회
+│   │   │   ├── jobs.py      # 채용공고 조회
+│   │   │   └── matching.py  # 매칭 검색/상세
+│   │   ├── core/            # 핵심 유틸리티
+│   │   │   ├── config.py    # 설정 관리
+│   │   │   ├── database.py  # DB 연결
+│   │   │   ├── logging.py   # 로깅 설정
+│   │   │   └── cli/         # CLI 명령어
+│   │   │       ├── job_crawler.py      # 크롤링
+│   │   │       ├── cleanup_expired_jobs.py  # 만료 공고 삭제
+│   │   │       └── scheduler.py        # 스케줄러
+│   │   ├── models/          # SQLAlchemy 모델
+│   │   ├── schemas/         # Pydantic 스키마
+│   │   ├── services/        # 비즈니스 로직
+│   │   │   ├── matching_service.py    # 매칭 통합 서비스
+│   │   │   ├── ml/                    # ML 서비스
+│   │   │   │   ├── embedding.py       # 임베딩 생성
+│   │   │   │   ├── vector_search.py   # 벡터 검색
+│   │   │   │   ├── scoring.py         # 점수 계산
+│   │   │   │   ├── penalties.py       # 페널티 계산
+│   │   │   │   └── feedback_generator.py  # 피드백 생성
+│   │   │   ├── parsing/               # 파일 파싱
+│   │   │   │   ├── pdf_parser.py
+│   │   │   │   ├── docx_parser.py
+│   │   │   │   ├── xlsx_parser.py
+│   │   │   │   ├── hwp_parser.py
+│   │   │   │   └── llm_parser.py
+│   │   │   └── indexing/              # 문장 인덱싱
+│   │   │       └── sentence_indexer.py
+│   │   └── utils/            # 유틸리티
+│   │       ├── job_scraper.py
+│   │       ├── job_parser.py
+│   │       ├── job_cleaner.py
+│   │       ├── job_structurizer.py
+│   │       └── job_saver.py
+│   ├── alembic/              # DB 마이그레이션
+│   └── scripts/              # 유틸리티 스크립트
+├── docker-compose.yml
+├── .env
+└── README.md
 ```
 
-> **💡 구조 설명**:
-> - `backend/app/services/matching_service.py` - 매칭 알고리즘의 핵심 통합 로직
-> - `backend/app/services/ml/` - ML 관련 서비스 (임베딩, 점수 계산, 페널티 등)
-> - `backend/app/services/parsing/` - 파일 파싱 서비스 (PDF, DOCX, XLSX, HWP)
-> - `backend/scripts/` - 테스트 및 유틸리티 스크립트 (운영 필수 아님)
-
----
-
-## 🎯 API 엔드포인트
-
-### 인증
-- `POST /api/v1/auth/register` - 회원가입
-- `POST /api/v1/auth/login` - 로그인
+## API 엔드포인트
 
 ### 이력서
 - `POST /api/v1/resumes/upload-and-process` - 이력서 업로드 및 처리
-  - 지원 형식: PDF, DOCX, XLSX, HWP
-  - 응답: `parsed_pages`, `parsed_sheets`, `total_text_length` 포함
 - `GET /api/v1/resumes` - 이력서 목록
 - `GET /api/v1/resumes/{resume_id}` - 이력서 상세
 
@@ -240,212 +170,124 @@ Project1/
 - `GET /api/v1/jobs/{job_id}` - 채용공고 상세
 - `POST /api/v1/jobs` - 채용공고 생성 (관리자)
 
-### 매칭 ⭐
-- `POST /api/v1/matching/search-jobs` - 이력서 기반 공고 매칭 (빠른 응답)
-  - 응답: 점수, 등급, 매칭 근거, 디버그 정보 포함
-- `GET /api/v1/matching/{matching_id}` - 매칭 상세 (실시간 계산)
-- `GET /api/v1/matching/{matching_id}/feedback` - GPT-4 피드백 (on-demand)
+### 매칭
+- `POST /api/v1/matching/search-jobs` - 이력서 기반 공고 매칭
+  - 요청: `{"resume_id": "uuid", "limit": 10}`
+  - 응답: 점수, 등급, 매칭 근거, 기술 스택 정보 포함
+- `GET /api/v1/matching/{matching_id}` - 매칭 상세
+- `GET /api/v1/matching/{matching_id}/feedback` - GPT-4 피드백 (선택)
 
----
+## 매칭 알고리즘
 
-## 📊 매칭 알고리즘 상세
+### 동적 임계값 시스템
 
-### 1. 동적 임계값 시스템 ⭐⭐⭐⭐⭐
-
-**종합 분석 기반 최적화 완료**
+기술 스택별로 세분화된 임계값을 적용하여 정확도를 향상시킵니다. 주요 기술 스택별 임계값은 실제 데이터 분석을 기반으로 최적화되었습니다.
 
 ```python
-# 기술 스택별 세분화된 임계값 (실제 데이터 분석 기반)
 tech_thresholds = {
-    # 백엔드 기술 스택
-    'java': 0.64, 'kotlin': 0.64, 'spring': 0.64,      # 종합 분석: 0.638 추천
-    'python': 0.61, 'fastapi': 0.61, 'django': 0.61,    # 종합 분석: 0.614 추천
-    'node.js': 0.62, 'express': 0.62,
-    
-    # 프론트엔드 기술 스택
-    'react': 0.66, 'next.js': 0.66, 'typescript': 0.66, # 종합 분석: 0.661 추천
-    'vue.js': 0.62, 'angular': 0.62,
-    'flutter': 0.62,
-    
-    # 모바일 개발
-    'android': 0.70, 'ios': 0.70,
-    
-    # 데이터베이스
-    'mysql': 0.61, 'postgresql': 0.61, 'mongodb': 0.61, # 종합 분석: 0.612 추천
-    
-    # 클라우드/인프라
-    'aws': 0.65, 'gcp': 0.65, 'azure': 0.65,            # 종합 분석: 0.651 추천
+    'java': 0.56, 'kotlin': 0.55, 'spring': 0.56,
+    'python': 0.56, 'fastapi': 0.56, 'django': 0.56,
+    'react': 0.59, 'next.js': 0.59, 'typescript': 0.59,
+    'mysql': 0.56, 'postgresql': 0.56, 'mongodb': 0.56,
+    'aws': 0.59, 'gcp': 0.59, 'azure': 0.59,
     'docker': 0.58, 'kubernetes': 0.65,
-    
-    # AI/ML
-    'tensorflow': 0.62, 'pytorch': 0.62, 'opencv': 0.62,
-    'langchain': 0.62, 'langgraph': 0.62,
-    
-    # API
-    'api': 0.63, 'rest': 0.63, 'restful': 0.63,
-    
-    # 기본값
     'general': 0.60
 }
 ```
 
-**특징**:
-- 충돌 기술 스택 자동 감지 (Java vs Python, React vs Flutter)
-- 실시간 로깅: 모든 매칭 과정 추적 가능
-- Near Miss 감지: 경계선 케이스 자동 감지 및 로깅
-- 테스트 데이터 기준으로 높은 정확도 관측
-
-### 2. 카테고리별 가중치
+### 카테고리별 가중치
 
 ```python
-SECTIONAL_WEIGHTS = {
-    "required_match": 0.60,          # 자격요건 매칭 (60% - 가장 중요)
-    "preferred_match": 0.20,         # 우대조건 매칭 (20% - 중요)
-    "experience_match": 0.10,        # 경력 매칭 (10% - 보조적)
-    "overall_similarity": 0.10,      # 전체 유사도 (10% - 보조적)
-    "education": 0.00,                # 학력 (가중치 없음)
-    "certification": 0.00,           # 자격증 (가중치 없음)
-    "language": 0.00                 # 언어 (가중치 없음)
+WEIGHTS = {
+    "required_match": 0.60,      # 자격요건 매칭
+    "preferred_match": 0.20,     # 우대조건 매칭
+    "experience_match": 0.10,    # 경력 매칭
+    "skills_similarity": 0.10,   # 기술 스택 유사도
 }
 ```
 
-### 3. 점수 계산 프로세스
+### 점수 계산 프로세스
 
-#### 3.1 문장 단위 매칭
-- 공고의 각 조건 문장 vs 이력서의 모든 문장 중 최고 유사도 선택
-- 동적 임계값 적용 (기술 스택별)
-- 부분 점수 허용 (임계값 미달 시 선형 보간)
+1. 문장 단위 매칭: 공고의 각 조건 문장과 이력서의 모든 문장을 비교하여 최고 유사도 선택
+2. 동적 임계값 적용: 기술 스택별 임계값 적용
+3. 가중 합산: 각 카테고리 점수를 가중치로 합산
+4. 감쇠 적용: 자격요건 매칭 실패 시 50% 감점
+5. 페널티 적용: 경력 레벨 불일치, 핵심 스킬 부족 등에 대한 페널티
+6. 최종 점수: 최종 점수 계산 및 등급 부여
 
-#### 3.2 가중 합산
-```python
-weighted_sum = (
-    required_score * 0.60 +
-    preferred_score * 0.20 +
-    experience_score * 0.10 +
-    overall_similarity * 0.10
-)
+### 등급 기준
+
+- Excellent (85%+): 매우 우수
+- Good (70-85%): 양호
+- Fair (55-70%): 보통
+- Caution (40-55%): 주의
+- Poor (<40%): 부적합
+
+## 채용공고 크롤링
+
+### 스케줄러 설정
+
+스케줄러는 매일 오전 9시에 자동으로 채용공고를 크롤링하고, 오전 9시 10분에 만료된 공고를 삭제합니다.
+
+```bash
+# 스케줄러 실행
+docker compose exec backend python3 -m app.core.cli.scheduler
+
+# 한 번만 실행 (테스트)
+docker compose exec backend python3 -m app.core.cli.scheduler --run-once
+
+# 만료된 공고만 삭제
+docker compose exec backend python3 -m app.core.cli.scheduler --cleanup-only
 ```
 
-#### 3.3 감쇠(Dampening) 적용
-```python
-# 자격요건 매칭 실패 시 50% 감점 (엄격성 강화)
-if required_score < 0.5:
-    dampened_sum = weighted_sum * 0.5
-else:
-    dampened_sum = weighted_sum
+### 환경 변수
+
+`.env` 파일에 다음 변수를 설정합니다:
+
+```env
+CRAWLER_BASE_URL=https://www.work24.go.kr/...
+CRAWLER_SOURCE=work24
+CRAWLER_MAX_RETRIES=3
+CRAWLER_RETRY_DELAY=5
 ```
 
-#### 3.4 페널티 적용
-```python
-penalties = {
-    "experience_level_mismatch": 0.15,           # 경력 레벨 불일치
-    "required_skill_critical_missing": 0.25,     # 핵심 필수 스킬 부족 (최대)
-    "experience_significantly_lacking": 0.20      # 경력 부족
-}
-
-# 경력 관련 페널티 상한 적용 (최대 15점)
-experience_penalty_cap = 0.15
-```
-
-#### 3.5 최종 점수
-```python
-final_score = max(0.0, dampened_sum - penalty_sum)
-```
-
-### 4. 등급 기준
-
-- 🟢 **Excellent** (85%+): 매우 우수 - 서류 통과 가능성 높음
-- 🟡 **Good** (70-85%): 양호 - 지원 권장
-- 🟠 **Fair** (55-70%): 보통 - 일부 조건 보완 필요
-- ⚠️ **Caution** (40-55%): 주의 - 신중히 검토 필요
-- 🔴 **Poor** (<40%): 부적합 - 기술 스택 불일치
-
-### 5. 디버그 정보
-
-매칭 결과에 `_debug` 필드 포함:
-```json
-{
-  "_debug": {
-    "raw_weighted_sum": 0.7234,
-    "dampened_sum": 0.7234,
-    "penalty_sum": 0.15,
-    "final_score_before_clipping": 0.5734,
-    "final_score_after_clipping": 0.5734
-  }
-}
-```
-
----
-
-## 📄 파일 파싱 기능
+## 파일 파싱
 
 ### 지원 형식
 
-#### 1. PDF
-- **라이브러리**: PyMuPDF (fitz)
-- **특징**: 모든 페이지 자동 추출
-- **페이지 구분**: `--- 페이지 N ---` 마커 추가
+- PDF: PyMuPDF를 사용하여 모든 페이지 추출
+- DOCX: LibreOffice를 통한 PDF 변환 후 파싱 (정확한 페이지 구조)
+- XLSX: openpyxl을 사용하여 모든 시트 추출
+- HWP: olefile을 사용한 텍스트 추출
 
-#### 2. DOCX
-- **라이브러리**: python-docx + LibreOffice
-- **특징**: 
-  - PDF 변환 후 파싱 (정확한 페이지 구조 추출)
-  - 변환 실패 시 직접 파싱 (폴백)
-  - 모든 단락 및 표 추출
-- **페이지 구분**: PDF 변환 시 자동 페이지 구분
+### 파싱 결과
 
-#### 3. XLSX
-- **라이브러리**: openpyxl
-- **특징**: 모든 시트 자동 추출
-- **시트 구분**: `--- 시트 N: {시트명} ---` 마커 추가
+이력서 파싱 시 다음 정보를 추출합니다:
 
-#### 4. HWP
-- **라이브러리**: olefile
-- **특징**: 
-  - OLE 파일 구조 파싱
-  - 텍스트 길이 기반 페이지 추정 (800자당 1페이지)
-  - 비HWP 파일은 일반 텍스트로 처리 (폴백)
+- 개인 정보: 이름, 전화번호, 이메일
+- 요약: 이력서 전체 요약
+- 경력 정보: 총 경력 연수, 경력 내역
+- 학력 정보: 학교명, 학위, 전공, 졸업년도
+- 기술 스택: 프로그래밍 언어, 프레임워크, 데이터베이스, 도구, 클라우드, AI/ML
+- 자격증: 자격증 목록
+- 언어 능력: 언어명, 숙련도
+- 프로젝트: 프로젝트명, 기간, 설명, 기술 스택
 
-### API 응답
+## 성능
 
-```json
-{
-  "resume_id": "...",
-  "file_name": "resume.pdf",
-  "parsed_pages": 3,
-  "parsed_sheets": null,
-  "total_text_length": 5420,
-  "parsed_data": { ... },
-  "extracted_skills": [...],
-  "extracted_experience_years": 3
-}
-```
+### 처리 속도
+- 단일 매칭 계산: 약 1초 (임베딩 사전 생성 시)
+- 벡터 검색: 약 0.1초 (pgvector HNSW)
+- 100개 공고 매칭: 약 24초 (평균 0.24초/건)
+- 10,000개 공고 검색: 약 10초 (pgvector HNSW)
 
----
-
-## 🎯 성능 및 검증
-
-### 검증 결과
-- **정확도**: 테스트 데이터 기준으로 높은 정확도 관측 (도메인 및 데이터에 따라 상이)
-- **오탐지율**: 동적 임계값 시스템으로 낮은 오탐지율 유지
-- **충돌 차단**: 충돌 기술 스택 자동 감지 및 차단 (Java vs Python, React vs Flutter)
-- **의미 매칭**: 문장 단위 세밀한 분석 적용
-
-### 성능 벤치마크
-- **100개 공고 매칭**: ~24초 (평균 0.24초/건)
-- **단일 매칭 계산**: ~1초 (임베딩 사전 생성 시)
-- **벡터 검색**: ~0.1초 (pgvector HNSW)
-- **10,000개 공고 검색**: ~10초 (pgvector HNSW)
-
-### 최적화 사항
+### 최적화
 - 섹션 임베딩 사전 생성 및 저장
 - 문장 단위 임베딩 사전 생성 및 저장
 - pgvector HNSW 인덱스 활용
-- 로깅 레벨 최적화 (운영 모드)
+- 로깅 레벨 최적화
 
----
-
-## 🛠️ 개발 가이드
+## 개발 가이드
 
 ### 개발 명령어
 
@@ -469,22 +311,10 @@ docker-compose exec backend alembic revision --autogenerate -m "message"
 docker-compose exec backend alembic upgrade head
 ```
 
-### 테스트 스크립트
-
-```bash
-# 단일 공고 인입 및 매칭 테스트
-docker-compose exec backend python scripts/ingest_and_match_single_job.py
-
-# 동적 임계값 종합 분석
-docker-compose exec backend python scripts/comprehensive_threshold_analysis.py
-
-# 성능 테스트 (100개 공고)
-docker-compose exec backend python scripts/test_100_jobs_performance.py
-```
-
 ### 환경 변수
 
 주요 환경 변수 (`.env` 파일):
+
 ```env
 # Database
 DATABASE_URL=postgresql://postgres:postgres@postgres:5432/auto_match
@@ -492,124 +322,32 @@ DATABASE_URL=postgresql://postgres:postgres@postgres:5432/auto_match
 # JWT
 JWT_SECRET_KEY=your-secret-key
 
-# OpenAI (선택)
+# OpenAI
 OPENAI_API_KEY=your-api-key
+OPENAI_MODEL=gpt-4o-mini
 
-# Embedding Server
-EMBEDDING_SERVER_URL=http://embedding:8001
+# Embedding
+EMBEDDING_MODEL=jhgan/ko-sroberta-multitask
+EMBEDDING_SERVICE_URL=http://embedding:8001
+
+# Crawler
+CRAWLER_BASE_URL=https://www.work24.go.kr/wk/a/b/1200/retriveDtlEmpSrchList.do?basicSetupYn=&careerTo=&keywordJobCd=&occupation=133100%2C133101&seqNo=&cloDateEndtParam=&payGbn=&templateInfo=&rot2WorkYn=&shsyWorkSecd=&resultCnt=10&keywordJobCont=&cert=&moreButtonYn=&minPay=&codeDepth2Info=11000&currentPageNo=1&eventNo=&mode=&major=&resrDutyExcYn=&eodwYn=&sortField=DATE&staArea=&sortOrderBy=DESC&keyword=&termSearchGbn=&carrEssYns=&benefitSrchAndOr=O&occupationParam=133100%2C133101&disableEmpHopeGbn=&actServExcYn=&keywordStaAreaNm=&maxPay=&emailApplyYn=&codeDepth1Info=11000&keywordEtcYn=&regDateStdtParam=&publDutyExcYn=&keywordJobCdSeqNo=&viewType=&exJobsCd=&templateDepthNmInfo=&region=&employGbn=&empTpGbcd=&computerPreferential=&infaYn=&cloDateStdtParam=&siteClcd=all&searchMode=Y&birthFromYY=&indArea=&careerTypes=&subEmpHopeYn=&tlmgYn=&academicGbn=&templateDepthNoInfo=&foriegn=&entryRoute=&mealOfferClcd=&basicSetupYnChk=&station=&holidayGbn=&srcKeyword=&academicGbnoEdu=noEdu&enterPriseGbn=&cloTermSearchGbn=&birthToYY=&keywordWantedTitle=&stationNm=&benefitGbn=&keywordFlag=&notSrcKeyword=&essCertChk=&depth2SelCode=&keywordBusiNm=&preferentialGbn=&rot3WorkYn=&regDateEndtParam=&pfMatterPreferential=&pageIndex=1&termContractMmcnt=&careerFrom=&laborHrShortYn=#scrollLoc
+CRAWLER_SOURCE=work24
+CRAWLER_MAX_RETRIES=3
+CRAWLER_RETRY_DELAY=5
 ```
 
----
+## 주요 개선사항
 
-## 🚀 최근 개선사항
+### 최근 업데이트
 
-### 1. 동적 임계값 적용 (2024)
-- **분석 기반 튜닝**: 이력서-공고 쌍 분석
-- **기술별 임계값 설정**: React (0.66), Python (0.61), Database (0.61) 등
-- **Near Miss 감지**: 경계선 케이스 자동 감지 및 로깅
+- 기술 스택 유사도 기반 매칭: 전체 유사도 대신 기술 스택 유사도 사용
+- Experience 섹션 매칭: JobPosting.description을 문장 단위로 분석하여 경력 매칭 강화
+- 기술 스택 정보 추출: 매칭 결과에 요구 기술 스택과 매칭된 기술 스택 표시
+- Location 파싱 개선: 채용 인원 정보가 location에 포함되지 않도록 필터링
+- 채용공고 크롤링 자동화: 스케줄러 기반 자동 크롭링 및 만료 공고 삭제
+- 중복 방지: DB 레벨, 애플리케이션 레벨, 스케줄러 레벨의 3단계 중복 방지
 
-### 2. 파일 파싱 개선 (2024)
-- **DOCX → PDF 변환**: LibreOffice 활용으로 정확한 페이지 구조 추출
-- **모든 페이지/시트 지원**: PDF, DOCX, XLSX, HWP 전체 내용 파싱
-- **폴백 메커니즘**: 변환 실패 시 직접 파싱으로 안정성 확보
+## 라이선스
 
-### 3. 섹션 임베딩 강화 (2024)
-- **강제 생성 로직**: required/preferred/description 임베딩 필수 생성
-- **프록시 메커니즘**: required 비어있을 시 preferred/description으로 대체
-- **문장 단위 임베딩**: 모든 조건 문장 개별 임베딩 저장
-
-### 4. 디버그 정보 추가 (2024)
-- **상세 로깅**: raw_score, dampened_score, penalty_sum 등
-- **매칭 근거 추적**: 각 조건별 매칭 여부 및 유사도 점수
-- **Near Miss 로깅**: 경계선 케이스 자동 감지
-
-### 5. 페널티 및 감쇠 로직 (2024)
-- **감쇠(Dampening)**: required < 0.5 시 50% 감점
-- **페널티 상한**: 경력 관련 페널티 최대 15점
-- **부분 점수 허용**: 임계값 미달 시 선형 보간
-
-### 6. 성능 최적화 (2024)
-- **임베딩 사전 생성**: 업로드/인입 시 즉시 생성 및 저장
-- **벡터 검색 최적화**: pgvector HNSW 인덱스 활용
-- **로깅 레벨 조정**: 운영 모드 최적화
-
----
-
-## 📝 개발 로드맵
-
-### ✅ 구현 완료 (Phase 1-6)
-- [x] 프로젝트 구조 및 Docker 환경 구축
-- [x] DB 스키마 설계 (pgvector 포함)
-- [x] 이력서/공고 파싱 (PDF/DOCX/XLSX/HWP)
-- [x] 임베딩 생성 (jhgan/ko-sroberta-multitask)
-- [x] 매칭 알고리즘 구현 ⭐
-- [x] 섹션별 임베딩 매칭 구현 ⭐
-- [x] 동적 임계값 시스템 구현 ⭐
-- [x] 가중치 튜닝 (테스트 기반)
-- [x] GPT-4 피드백 생성
-- [x] 테스트 및 검증 진행
-- [x] 중복 방지 UNIQUE INDEX 추가
-- [x] 만료 자동 비활성화 트리거
-- [x] 실시간 계산 방식으로 변경
-- [x] 2단계 API 구현 (빠른 검색 + on-demand 피드백)
-- [x] 경력 페널티 캡 적용
-- [x] 의미 매칭 강화
-- [x] 문장 단위 세밀한 매칭
-- [x] HWP 파일 파싱 기능
-- [x] 섹션 임베딩 생성 및 프록시 로직
-- [x] 디버그 정보 추가
-
-### 🚧 다음 단계 (Phase 7)
-- [ ] **사람인 API 연동 + GPT-4 구조화** ← 다음!
-- [ ] 프론트엔드 연동
-- [ ] 북마크/지원 기능
-- [ ] 크롤링 스케줄러 구현
-
-### 📅 예정 (Phase 8-9)
-- [ ] Cloud Run 배포 (GCP)
-- [ ] 원티드/로켓펀치 크롤링
-- [ ] 모니터링 대시보드
-- [ ] Slack 연동 (실시간 알림)
-
----
-
-## 🔑 핵심 구현 파일
-
-### 매칭 알고리즘 ⭐⭐⭐⭐⭐
-```
-backend/app/services/
-├── matching_service.py           # 매칭 통합 서비스
-│   ├── _calculate_matching_score_sectional_sentences()  # 섹션별 문장 단위 매칭
-│   ├── _get_dynamic_threshold()  # 동적 임계값 적용
-│   └── _calculate_overall_similarity()  # 전체 유사도 계산
-│
-├── ml/
-│   ├── embedding.py              # 임베딩 생성
-│   ├── vector_search.py          # 벡터 검색
-│   ├── scoring.py                # 점수 계산
-│   ├── sectional_scoring.py      # 섹션별 점수
-│   ├── penalties.py              # 페널티 계산
-│   └── feedback_generator.py     # 피드백 생성
-│
-└── parsing/
-    ├── llm_parser.py             # GPT-4 파싱 (폴백 포함)
-    ├── pdf_parser.py             # PDF 파서 (모든 페이지 지원)
-    ├── docx_parser.py            # DOCX 파서 (PDF 변환 지원)
-    ├── xlsx_parser.py            # XLSX 파서 (모든 시트 지원)
-    └── hwp_parser.py             # HWP 파서 (텍스트 추출)
-```
-
-### 테스트 스크립트
-```
-backend/scripts/
-├── ingest_and_match_single_job.py        # 단일 공고 인입/매칭
-├── comprehensive_threshold_analysis.py    # 동적 임계값 종합 분석
-└── test_100_jobs_performance.py          # 성능 테스트
-```
-
----
-
-
-**💡 Tip**: 상세한 설명은 [`docs/`](docs/) 폴더를 참고하세요!
-
-**🎯 핵심**: 이 프로젝트는 **문장 단위 의미 매칭**과 **동적 임계값 시스템**을 통해 매칭 정확도를 향상시키기 위해 설계되었습니다. 모든 매칭 과정은 로깅되어 추적 가능하며, 디버그 정보를 통해 점수 계산 과정을 확인할 수 있습니다.
+이 프로젝트는 내부 사용을 위한 것입니다.

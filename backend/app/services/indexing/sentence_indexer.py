@@ -59,10 +59,12 @@ class SentenceIndexer:
         self.db.commit()
         return count
 
-    def index_job(self, job: JobPosting) -> Tuple[int, int]:
-        """Split job required/preferred sentences and persist embeddings. Returns (req_count, pref_count)."""
+    def index_job(self, job: JobPosting) -> Tuple[int, int, int]:
+        """Split job required/preferred/experience sentences and persist embeddings. Returns (req_count, pref_count, exp_count)."""
         req_sentences: List[str] = []
         pref_sentences: List[str] = []
+        exp_sentences: List[str] = []
+        
         try:
             requirements = job.requirements or {}
             req_src = requirements.get("required") or []
@@ -74,9 +76,19 @@ class SentenceIndexer:
             pref_sentences = self._llm_split_sentences(pref_joined) if pref_joined else []
         except Exception as e:
             logger.warning(f"Job requirements access failed: {e}")
+        
+        # Experience section: job.description을 문장으로 분할
+        try:
+            description = job.description or ""
+            if description:
+                exp_sentences = self._llm_split_sentences(description)
+        except Exception as e:
+            logger.warning(f"Job description access failed: {e}")
 
         r_count = 0
         p_count = 0
+        exp_count = 0
+        
         for idx, s in enumerate(req_sentences):
             try:
                 emb = self.embedding.generate_embedding(s)
@@ -84,6 +96,7 @@ class SentenceIndexer:
                 r_count += 1
             except Exception as e:
                 logger.warning(f"Failed to embed job required sentence: {e}")
+        
         for idx, s in enumerate(pref_sentences):
             try:
                 emb = self.embedding.generate_embedding(s)
@@ -91,7 +104,16 @@ class SentenceIndexer:
                 p_count += 1
             except Exception as e:
                 logger.warning(f"Failed to embed job preferred sentence: {e}")
+        
+        for idx, s in enumerate(exp_sentences):
+            try:
+                emb = self.embedding.generate_embedding(s)
+                self.db.add(JobSentence(job_id=job.id, section="experience", idx=idx, text=s, embedding=emb))
+                exp_count += 1
+            except Exception as e:
+                logger.warning(f"Failed to embed job experience sentence: {e}")
+        
         self.db.commit()
-        return r_count, p_count
+        return r_count, p_count, exp_count
 
 

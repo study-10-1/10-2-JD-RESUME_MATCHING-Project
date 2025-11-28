@@ -129,18 +129,31 @@ class MatchingService:
                 matching_result = self.calculate_matching_score(job, resume, generate_feedback=False)
                 
                 # 결과에 벡터 유사도 포함
+                company_info = None
+                if job.company:
+                    company_info = {
+                        "name": job.company.name,
+                        "website": job.company.website
+                    }
+                
+                # 기술 스택 정보 추출
+                skills_info = self._extract_skills_info(job, matching_result.matching_evidence)
+                
                 result_dict = {
                     "matching_id": self._generate_matching_id(str(resume.id), str(job.id)),
                     "job_id": str(job.id),
                     "job_title": job.title,
                     "company_name": job.company.name if job.company else None,
+                    "company": company_info,  # 회사 정보 (이름, 웹사이트) 추가
                     "location": job.location,
                     "experience_level": job.experience_level,
+                    "job_url": job.external_url,  # 공고 URL 추가
                     "overall_score": round(float(matching_result.overall_score) * 100, 1),  # 백분율로 변환
                     "grade": matching_result.grade,
                     "category_scores": self._convert_category_scores_to_percentage(matching_result.category_scores),
                     "matching_evidence": matching_result.matching_evidence,
-                    "penalties": matching_result.penalties
+                    "penalties": matching_result.penalties,
+                    "skills": skills_info  # 기술 스택 정보 추가
                 }
                 
                 results.append(result_dict)
@@ -152,10 +165,15 @@ class MatchingService:
         # 4. 전체 점수로 재정렬
         results.sort(key=lambda x: x["overall_score"], reverse=True)
         
-        processing_time = int((time.time() - start_time) * 1000)
-        logger.info(f"Matching completed in {processing_time}ms")
+        # 5. 상위 n개만 반환 (limit 파라미터 적용)
+        total_count = len(results)
+        limited_results = results[:limit]
         
-        return results
+        processing_time = int((time.time() - start_time) * 1000)
+        logger.info(f"Matching completed in {processing_time}ms: {len(limited_results)}/{total_count} results returned (limit={limit})")
+        
+        # 전체 매칭 수를 결과에 포함 (API에서 사용)
+        return limited_results
     
     def calculate_matching_score(
         self,
@@ -383,35 +401,178 @@ class MatchingService:
             logger.warning(f"Overall similarity calculation failed: {e}")
             return 0.0
 
+    def _evaluate_condition_with_composite_tech(
+        self,
+        condition: str,
+        resume_sentences: List[str],
+        resume_embeddings: List[list],
+        condition_emb: List[float],
+        section: str
+    ) -> tuple:
+        """
+        복합 기술 조건 평가 (OR 조건)
+        예: "MySQL, PostgreSQL" → 각각 개별 매칭 후 하나라도 매칭되면 True
+        """
+        import re
+        
+        # 기술 키워드 추출
+        tech_keywords = [
+            "python", "java", "kotlin", "javascript", "typescript",
+            "react", "vue", "angular", "next.js", "nestjs", "express",
+            "django", "fastapi", "spring", "spring boot", "springboot",
+            "mysql", "postgresql", "mongodb", "redis", "neo4j",
+            "aws", "gcp", "azure", "docker", "kubernetes", "k8s",
+            "tensorflow", "pytorch", "opencv", "langchain", "langgraph", "llm", "ml", "ai",
+            "node.js", "nodejs", "flutter", "android", "ios", "swift",
+            # 데이터베이스 관련
+            "rdbms", "database", "db", "데이터베이스",
+            # AI/ML 관련
+            "vectordb", "vector db", "rag", "agent", "fine-tuning", "finetuning",
+            # 상태 관리/프론트엔드
+            "zustand", "redux", "react query", "tanstack query",
+            # 기타
+            "rabbitmq", "kafka", "celery", "nginx"
+        ]
+        
+        condition_lower = condition.lower()
+        found_techs = []
+        
+        for tech in tech_keywords:
+            pattern = r'\b' + re.escape(tech) + r'\b'
+            if re.search(pattern, condition_lower):
+                found_techs.append(tech)
+        
+        # 복합 조건인 경우 (2개 이상의 기술이 언급된 경우)
+        if len(found_techs) >= 2:
+            # 각 기술별로 개별 매칭 수행
+            tech_matches = []
+            tech_similarities = []
+            tech_thresholds = []
+            
+            # 전체 조건에 대한 유사도 계산
+            best_sim, best_sentence = self.scoring._best_sentence_match(
+                condition,
+                resume_sentences,
+                resume_embeddings,
+                condition_embedding=condition_emb
+            )
+            
+            # 각 기술별로 검증
+            resume_text_lower = " ".join(resume_sentences).lower()
+            best_sentence_lower = best_sentence.lower() if best_sentence else ""
+            
+            for tech in found_techs:
+                # 해당 기술에 대한 임계값 가져오기
+                tech_threshold = self._get_dynamic_threshold(tech, section)
+                
+                # 기술이 이력서에 있는지 확인
+                tech_in_resume = tech.lower() in resume_text_lower
+                
+                # 기술이 매칭된 문장에 있는지 확인
+                tech_in_matched_sentence = tech.lower() in best_sentence_lower
+                
+                # 기술 키워드 검증: 매칭된 문장에 기술 키워드가 있어야 함 (엄격한 검증)
+                if tech_in_matched_sentence:
+                    # 매칭된 문장에 기술 키워드가 있으면 유사도 확인
+                    tech_matched = best_sim >= tech_threshold
+                else:
+                    # 매칭된 문장에 기술 키워드가 없으면 무조건 False Positive로 차단
+                    # 이력서 전체에 있어도 매칭된 문장에 없으면 의미가 없음
+                    tech_matched = False
+                    logger.debug(f"Tech '{tech}' not in matched sentence, rejecting: {best_sentence[:50] if best_sentence else 'None'}...")
+                
+                tech_matches.append(tech_matched)
+                tech_similarities.append(best_sim)
+                tech_thresholds.append(tech_threshold)
+            
+            # OR 조건: 하나라도 매칭되면 True
+            matched = any(tech_matches)
+            
+            # 가장 높은 유사도와 임계값 사용
+            best_sim = max(tech_similarities) if tech_similarities else 0.0
+            threshold = min(tech_thresholds) if tech_thresholds else 0.6  # 가장 낮은 임계값 사용 (OR 조건이므로)
+            
+            if matched:
+                logger.info(f"Composite condition matched (OR): {found_techs} → {matched} (best_sim: {best_sim:.3f}, threshold: {threshold:.3f})")
+            else:
+                logger.warning(f"Composite condition rejected: {found_techs} (best_sim: {best_sim:.3f}, threshold: {threshold:.3f}, matched_sentence: {best_sentence[:50] if best_sentence else 'None'}...)")
+            
+            return matched, best_sim, best_sentence, threshold
+        
+        # 단일 기술이거나 기술이 없는 경우 기존 로직 사용
+        best_sim, best_sentence = self.scoring._best_sentence_match(
+            condition,
+            resume_sentences,
+            resume_embeddings,
+            condition_embedding=condition_emb
+        )
+        
+        threshold = self._get_dynamic_threshold(condition, section)
+        matched = best_sim >= threshold
+        
+        # 기술 키워드 검증: 조건에 기술 키워드가 있으면 매칭된 문장에도 해당 키워드가 있어야 함
+        if matched and found_techs:
+            # 매칭된 문장에 기술 키워드가 있는지 확인
+            best_sentence_lower = best_sentence.lower() if best_sentence else ""
+            tech_in_matched_sentence = any(
+                tech.lower() in best_sentence_lower 
+                for tech in found_techs
+            )
+            
+            # 기술 키워드가 매칭된 문장에 없으면 무조건 False Positive로 차단
+            if not tech_in_matched_sentence:
+                logger.warning(
+                    f"False Positive detected: '{condition[:50]}...' "
+                    f"(tech: {found_techs}, sim: {best_sim:.3f}, threshold: {threshold:.3f}) "
+                    f"matched to: '{best_sentence[:50]}...' (tech not in matched sentence)"
+                )
+                matched = False
+        
+        return matched, best_sim, best_sentence, threshold
+    
     def _get_dynamic_threshold(self, condition: str, section: str) -> float:
         """조건별 동적 임계값 설정"""
         condition_lower = condition.lower()
         
-        # 기술 스택별 세분화된 임계값 (종합 분석 결과 기반 최적화 - 완전판)
+        # 기술 스택별 세분화된 임계값 (2025-11-18 종합 튜닝 결과 반영)
         tech_thresholds = {
-            # 백엔드 기술 스택 (종합 분석 결과 기반 최적화)
-            'java': 0.64, 'kotlin': 0.64, 'spring': 0.64,  # 0.60 → 0.64 (분석 결과: 0.638 추천)
-            'python': 0.61, 'fastapi': 0.61, 'django': 0.61,  # 0.58 → 0.61 (분석 결과: 0.614 추천)
-            'node.js': 0.62, 'express': 0.62,  # 유지
+            # 백엔드 기술 스택 (튜닝 결과 반영)
+            'java': 0.56, 'spring': 0.56,  # 0.64 → 0.56 (분석: 0.563 추천)
+            'kotlin': 0.55,  # 0.64 → 0.55 (분석: 0.550 추천)
+            'python': 0.56,  # 0.61 → 0.56 (분석: 0.562 추천)
+            'fastapi': 0.55, 'django': 0.55,  # 0.61 → 0.55 (분석: 0.550 추천)
+            'node.js': 0.56, 'express': 0.56,  # 0.62 → 0.56 (분석: 0.562 추천)
+            'spring boot': 0.56,  # 0.60 → 0.56 (분석: 0.562 추천)
             
-            # 프론트엔드 기술 스택 (종합 분석 결과 기반 최적화)
-            'react': 0.66, 'next.js': 0.66, 'typescript': 0.66,  # 0.60 → 0.66 (분석 결과: 0.661 추천)
-            'vue.js': 0.62, 'angular': 0.62,  # 유지
+            # 프론트엔드 기술 스택 (튜닝 결과 반영)
+            'react': 0.59, 'typescript': 0.59,  # 0.66 → 0.59 (분석: 0.593 추천)
+            'next.js': 0.59,  # 0.66 → 0.59 (분석: 0.590 추천)
+            'vue': 0.60, 'vue.js': 0.60,  # 0.62 → 0.60 (분석: 0.597 추천)
+            'angular': 0.62,  # 유지
             'flutter': 0.62,  # 유지
+            'javascript': 0.56,  # 0.60 → 0.56 (분석: 0.564 추천)
             
-            # 모바일 개발 (현재 적절)
-            'android': 0.70, 'ios': 0.70,  # 유지
+            # 모바일 개발 (튜닝 결과 반영)
+            'android': 0.55,  # 0.70 → 0.55 (분석: 0.550 추천, 최우선 조정)
+            'ios': 0.70,  # 유지 (데이터 부족)
             
-            # 데이터베이스 (종합 분석 결과 기반 최적화)
-            'mysql': 0.61, 'postgresql': 0.61, 'mongodb': 0.61,  # 0.55 → 0.61 (분석 결과: 0.612 추천)
+            # 데이터베이스 (튜닝 결과 반영)
+            'mysql': 0.55, 'postgresql': 0.55,  # 0.61 → 0.55 (분석: 0.550 추천)
+            'mongodb': 0.61,  # 유지
             
-            # 클라우드/인프라 (종합 분석 결과 기반 최적화)
-            'aws': 0.65, 'gcp': 0.65, 'azure': 0.65,  # 0.62 → 0.65 (분석 결과: 0.651 추천)
-            'docker': 0.58, 'kubernetes': 0.65,  # 유지
+            # 클라우드/인프라 (학습 데이터 기반 정밀 조정)
+            'aws': 0.59, 'gcp': 0.59,  # 0.65 → 0.59 (학습 데이터: 0.592 추천)
+            'azure': 0.65,  # 유지
+            'docker': 0.58,  # 유지
+            'kubernetes': 0.65,  # 유지
             
-            # AI/ML (유지)
-            'tensorflow': 0.62, 'pytorch': 0.62, 'opencv': 0.62,
-            'langchain': 0.62, 'langgraph': 0.62
+            # AI/ML (튜닝 결과 반영)
+            'tensorflow': 0.62, 'pytorch': 0.62, 'opencv': 0.62,  # 유지
+            'langchain': 0.62, 'langgraph': 0.62,  # 유지
+            'llm': 0.55, 'ml': 0.55, 'ai': 0.55,  # 0.60 → 0.55 (분석: 0.550 추천)
+            
+            # API (추가)
+            'api': 0.63, 'rest': 0.63, 'restful': 0.63,  # 유지
         }
         
         # 가장 높은 임계값 찾기
@@ -448,17 +609,15 @@ class MatchingService:
             for idx, condition in enumerate(job_sentences):
                 # DB 임베딩이 있으면 사용, 없으면 None 전달 (함수 내에서 생성)
                 condition_emb = job_embeddings[idx] if idx < len(job_embeddings) else None
-                best_sim, best_sentence = self.scoring._best_sentence_match(
-                    condition, 
-                    resume_sentences, 
+                
+                # 복합 조건 처리: 여러 기술이 함께 언급된 경우 OR 조건으로 평가
+                matched, best_sim, best_sentence, threshold = self._evaluate_condition_with_composite_tech(
+                    condition,
+                    resume_sentences,
                     resume_embeddings,
-                    condition_embedding=condition_emb
+                    condition_emb,
+                    section
                 )
-                
-                # 임계값 설정 (조건별 세분화)
-                threshold = self._get_dynamic_threshold(condition, section)
-                
-                matched = best_sim >= threshold
                 analysis = {
                     'condition': condition,
                     'matched': matched,
@@ -686,6 +845,132 @@ class MatchingService:
         )
         
         return matching_result
+    
+    def _extract_skills_info(self, job: JobPosting, matching_evidence: dict) -> dict:
+        """
+        공고에서 요구하는 기술 스택과 매칭된 기술 스택 추출
+        matching_evidence의 detailed_analysis를 활용하여 실제 매칭된 조건에서 기술 추출
+        
+        Returns:
+            {
+                "required": ["Java", "Spring", "MySQL"],  # 공고에서 요구하는 기술
+                "preferred": ["AWS", "Docker"],  # 공고에서 우대하는 기술
+                "matched_required": ["Java", "Spring"],  # 매칭된 필수 기술
+                "matched_preferred": ["AWS"],  # 매칭된 우대 기술
+                "missing_required": ["MySQL"],  # 누락된 필수 기술
+                "missing_preferred": ["Docker"]  # 누락된 우대 기술
+            }
+        """
+        import re
+        
+        # 기술 키워드 목록 (기존 _evaluate_condition_with_composite_tech와 동일)
+        tech_keywords = [
+            "python", "java", "kotlin", "javascript", "typescript",
+            "react", "vue", "angular", "next.js", "nestjs", "express",
+            "django", "fastapi", "spring", "spring boot", "springboot",
+            "mysql", "postgresql", "mongodb", "redis", "neo4j",
+            "aws", "gcp", "azure", "docker", "kubernetes", "k8s",
+            "tensorflow", "pytorch", "opencv", "langchain", "langgraph", "llm", "ml", "ai",
+            "node.js", "nodejs", "flutter", "android", "ios", "swift",
+            "rdbms", "database", "db", "데이터베이스",
+            "vectordb", "vector db", "rag", "agent", "fine-tuning", "finetuning",
+            "zustand", "redux", "react query", "tanstack query",
+            "rabbitmq", "kafka", "celery", "nginx"
+        ]
+        
+        def extract_techs_from_text(text: str) -> set:
+            """텍스트에서 기술 키워드 추출"""
+            if not text:
+                return set()
+            text_lower = text.lower()
+            found = set()
+            for tech in tech_keywords:
+                pattern = r'\b' + re.escape(tech) + r'\b'
+                if re.search(pattern, text_lower):
+                    found.add(tech)
+            return found
+        
+        # 1. 공고의 requirements에서 전체 기술 추출 (모든 조건 분석)
+        required_skills = set()
+        preferred_skills = set()
+        
+        if job.requirements:
+            required_conditions = job.requirements.get('required', [])
+            preferred_conditions = job.requirements.get('preferred', [])
+            
+            # 모든 조건에서 기술 추출
+            for condition in required_conditions:
+                required_skills.update(extract_techs_from_text(str(condition)))
+            
+            for condition in preferred_conditions:
+                preferred_skills.update(extract_techs_from_text(str(condition)))
+        
+        # parsed_skills도 추가
+        if job.parsed_skills:
+            for skill in job.parsed_skills:
+                required_skills.update(extract_techs_from_text(str(skill)))
+        
+        # 2. matching_evidence의 detailed_analysis를 활용하여 실제 매칭된 기술 추출
+        matched_required = set()
+        matched_preferred = set()
+        
+        if matching_evidence:
+            # required_skills의 detailed_analysis에서 매칭된 조건 추출
+            required_evidence = matching_evidence.get('required_skills', {})
+            if required_evidence:
+                detailed_analysis = required_evidence.get('detailed_analysis', [])
+                for analysis in detailed_analysis:
+                    condition = analysis.get('condition', '')
+                    matched = analysis.get('matched', False)
+                    matched_sentence = analysis.get('matched_sentence', '')
+                    
+                    # 매칭된 조건에서 기술 추출
+                    if matched:
+                        # 조건 자체에서 기술 추출
+                        matched_required.update(extract_techs_from_text(str(condition)))
+                        # 매칭된 문장에서도 기술 추출 (더 정확)
+                        if matched_sentence:
+                            matched_required.update(extract_techs_from_text(str(matched_sentence)))
+                
+                # matched 리스트에서도 추출 (fallback)
+                matched_conditions = required_evidence.get('matched', [])
+                for condition in matched_conditions:
+                    matched_required.update(extract_techs_from_text(str(condition)))
+            
+            # preferred_skills의 detailed_analysis에서 매칭된 조건 추출
+            preferred_evidence = matching_evidence.get('preferred_skills', {})
+            if preferred_evidence:
+                detailed_analysis = preferred_evidence.get('detailed_analysis', [])
+                for analysis in detailed_analysis:
+                    condition = analysis.get('condition', '')
+                    matched = analysis.get('matched', False)
+                    matched_sentence = analysis.get('matched_sentence', '')
+                    
+                    # 매칭된 조건에서 기술 추출
+                    if matched:
+                        # 조건 자체에서 기술 추출
+                        matched_preferred.update(extract_techs_from_text(str(condition)))
+                        # 매칭된 문장에서도 기술 추출 (더 정확)
+                        if matched_sentence:
+                            matched_preferred.update(extract_techs_from_text(str(matched_sentence)))
+                
+                # matched 리스트에서도 추출 (fallback)
+                matched_conditions = preferred_evidence.get('matched', [])
+                for condition in matched_conditions:
+                    matched_preferred.update(extract_techs_from_text(str(condition)))
+        
+        # 3. 누락된 기술 계산 (요구 기술 - 매칭된 기술)
+        missing_required = required_skills - matched_required
+        missing_preferred = preferred_skills - matched_preferred
+        
+        return {
+            "required": sorted(list(required_skills)),
+            "preferred": sorted(list(preferred_skills)),
+            "matched_required": sorted(list(matched_required)),
+            "matched_preferred": sorted(list(matched_preferred)),
+            "missing_required": sorted(list(missing_required)),
+            "missing_preferred": sorted(list(missing_preferred))
+        }
     
     def _convert_category_scores_to_percentage(self, category_scores: dict) -> dict:
         """카테고리 점수들을 백분율로 변환"""

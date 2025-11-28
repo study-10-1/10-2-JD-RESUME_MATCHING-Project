@@ -76,12 +76,18 @@ services:
       - EMBEDDING_SERVICE_URL=http://embedding:8001
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      # Crawler (스케줄러용)
+      - CRAWLER_BASE_URL=${CRAWLER_BASE_URL}
+      - CRAWLER_SOURCE=${CRAWLER_SOURCE:-work24}
+      - CRAWLER_MAX_RETRIES=${CRAWLER_MAX_RETRIES:-3}
+      - CRAWLER_RETRY_DELAY=${CRAWLER_RETRY_DELAY:-5}
       # Cross-encoder 제거됨
     volumes:
       - ./backend:/app
       - ./data:/data
       - ml_models:/app/ml_models
       - upload_files:/app/uploads
+      - /Users/taesu/Downloads/techeer_resume:/data/techeer_resume:ro
     depends_on:
       postgres:
         condition: service_healthy

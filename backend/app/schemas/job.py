@@ -70,6 +70,7 @@ class JobPostingResponse(JobPostingBase):
     posted_at: Optional[date] = None
     is_active: bool
     created_at: datetime
+    external_url: Optional[str] = None  # 공고 URL 추가
 
 
 class JobPostingDetail(JobPostingResponse):

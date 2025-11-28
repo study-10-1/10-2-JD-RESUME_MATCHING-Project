@@ -69,13 +69,15 @@ class JobMatchResponse(BaseModel):
     """Job match response schema (for resume-based search)"""
     job_id: UUID
     title: str
-    company: Optional[dict] = None
+    company_name: Optional[str] = None
+    company: Optional[dict] = None  # 회사 정보 (name, website 포함)
     overall_score: float
     grade: str
     category_scores: dict
     matching_evidence: Optional[dict] = None
     location: Optional[str] = None
     posted_at: Optional[str] = None
+    job_url: Optional[str] = None  # 공고 URL 추가
 
 
 class ResumeMatchResponse(BaseModel):

@@ -86,6 +86,128 @@ class LLMParser:
             logger.error(f"LLM parsing failed: {e}")
             return self._fallback_parsing(raw_text)
 
+    def extract_job_requirements(self, text: str) -> Dict[str, Any]:
+        """
+        채용공고 텍스트에서 자격요건(required)과 우대조건(preferred)을 추출합니다.
+        
+        Args:
+            text: 채용공고 텍스트 (HTML 파싱 후 정제된 텍스트)
+            
+        Returns:
+            {
+                "required": List[str],  # 필수 자격요건 리스트
+                "preferred": List[str]  # 우대조건 리스트
+            }
+        """
+        if not text:
+            return {"required": [], "preferred": []}
+        
+        if not self.client:
+            logger.warning("LLM client not available. Using fallback for requirements extraction.")
+            return self._fallback_extract_requirements(text)
+        
+        try:
+            prompt = f"""
+다음 채용공고 텍스트에서 자격요건(필수조건)과 우대조건을 정확하게 구분하여 추출하세요.
+
+채용공고 텍스트:
+```
+{text[:6000]}  # 최대 6000자
+```
+
+주의사항:
+1. **자격요건(required)**: 반드시 충족해야 하는 필수 조건
+   - 예: "경력 3년 이상", "대졸 이상", "Java 개발 경험 필수", "TOEIC 800점 이상"
+   - "필수", "요구", "필요", "반드시" 등의 키워드가 있는 조건
+   - 모집요강의 기본 조건 (경력, 학력, 자격증 등)
+
+2. **우대조건(preferred)**: 있으면 좋지만 필수는 아닌 조건
+   - 예: "우대사항", "선호조건", "가산점", "bonus"
+   - "우대", "선호", "가산", "플러스" 등의 키워드가 있는 조건
+
+3. 각 조건을 개별 문장으로 분리하세요.
+   - 예: "Java, Spring Boot 개발 경험" → ["Java 개발 경험", "Spring Boot 개발 경험"]
+   - 예: "경력 3년 이상, 대졸 이상" → ["경력 3년 이상", "대졸 이상"]
+
+4. 모집요강의 기본 정보(모집 직종, 모집 인원, 근무지 등)는 자격요건이 아닙니다.
+
+5. 테이블 형태의 데이터도 정확히 파싱하세요.
+
+JSON 형식으로 반환하세요:
+{{
+  "required": ["조건1", "조건2", ...],
+  "preferred": ["조건1", "조건2", ...]
+}}
+"""
+            
+            completion_params = {
+                "model": self.model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "당신은 채용공고 분석 전문가입니다. 자격요건과 우대조건을 정확하게 구분하여 추출합니다."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                "response_format": {"type": "json_object"},
+                "temperature": 0.1
+            }
+            
+            response = self.client.chat.completions.create(**completion_params)
+            result_text = response.choices[0].message.content
+            parsed_data = json.loads(result_text)
+            
+            # 결과 검증 및 정제
+            required = parsed_data.get("required", [])
+            preferred = parsed_data.get("preferred", [])
+            
+            # 리스트가 아닌 경우 변환
+            if not isinstance(required, list):
+                required = [str(required)] if required else []
+            if not isinstance(preferred, list):
+                preferred = [str(preferred)] if preferred else []
+            
+            # 빈 문자열 제거 및 정제
+            required = [r.strip() for r in required if r and r.strip() and len(r.strip()) > 5]
+            preferred = [p.strip() for p in preferred if p and p.strip() and len(p.strip()) > 5]
+            
+            logger.info(f"LLM requirements extraction successful: required={len(required)}, preferred={len(preferred)}")
+            
+            return {
+                "required": required[:100],  # 최대 100개
+                "preferred": preferred[:100]
+            }
+            
+        except Exception as e:
+            logger.error(f"LLM requirements extraction failed: {e}")
+            return self._fallback_extract_requirements(text)
+    
+    def _fallback_extract_requirements(self, text: str) -> Dict[str, Any]:
+        """LLM 실패 시 키워드 기반 fallback"""
+        required = []
+        preferred = []
+        
+        lines = [line.strip() for line in text.split('\n') if line.strip()]
+        
+        for line in lines:
+            line_lower = line.lower()
+            # 자격요건 키워드
+            if any(kw in line_lower for kw in ['필수', '요구', '필요', 'required', '반드시', '기본']):
+                if len(line) > 10:  # 너무 짧은 것은 제외
+                    required.append(line)
+            # 우대조건 키워드
+            elif any(kw in line_lower for kw in ['우대', '선호', 'preferred', 'bonus', '가산', '플러스']):
+                if len(line) > 10:
+                    preferred.append(line)
+        
+        return {
+            "required": required[:50],
+            "preferred": preferred[:50]
+        }
+    
     def extract_sentences(self, raw_text: str) -> Dict[str, Any]:
         """Split text into clean, standalone sentences using LLM; fallback to regex.
 

@@ -51,6 +51,10 @@ httpx==0.25.1
 aiofiles==23.2.1
 python-dateutil==2.8.2
 
+# Web Scraping
+beautifulsoup4==4.12.2
+requests==2.31.0
+
 # Scheduling
 APScheduler==3.10.4  # 스케줄링 (일일 공고 동기화)
 
